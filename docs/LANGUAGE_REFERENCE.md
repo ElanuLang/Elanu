@@ -1005,7 +1005,8 @@ Current contract:
 - existing-designation insertion currently accepts persistent `live T` / `maybe live T`
   designation state;
 - the destination must be mutable owner-relative `[live T]` membership with the same
-  element model as the designation;
+  element model as the designation; its owner may be a statically declared modeled root or a
+  persistent `live T` / present `maybe live T` designation of an exact modeled identity;
 - an absent `maybe live T` source fails the action transactionally;
 - insertion appends one occurrence of that exact designation to the destination sequence;
 - insertion preserves child identity and does not create a second child;
@@ -1060,7 +1061,9 @@ remove selectedLine from invoice.activeLines
 
 For both forms, the target may be a mutable owner-relative `[live T]` state-model
 member or a direct owner-relative identity-preserving `filter` view whose source is
-such mutable membership. Removal edits membership structure; it does not destroy the
+such mutable membership. For mutable stored membership, the owner may be a statically
+declared modeled root or a persistent `live T` / present `maybe live T` designation of an
+exact modeled identity. Removal edits membership structure; it does not destroy the
 designated child or grant writable authority.
 
 For positional removal:

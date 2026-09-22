@@ -2,6 +2,8 @@ pub mod ast;
 mod create_surface;
 mod designation_runtime_metadata;
 pub mod diagnostic;
+#[cfg(test)]
+mod dynamic_owner_structural_edit_tests;
 mod existing_designation_insert_surface;
 mod filter_integration;
 pub mod lexer;

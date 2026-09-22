@@ -180,17 +180,23 @@ impl InsertLowerer<'_> {
             ));
             return malformed_insert(location);
         };
-        let Some(root) = self.roots.get(root_name) else {
+        let owner_model = if let Some(root) = self.roots.get(root_name) {
+            root.model_name.clone()
+        } else if let Some(model) = self.designation_models.get(root_name) {
+            model.clone()
+        } else {
             self.errors.push(diag(
                 location,
-                format!("'{root_name}' is not a modeled-state owner root"),
+                format!(
+                    "'{root_name}' is not a modeled-state owner root or persistent live designation"
+                ),
             ));
             return malformed_insert(location);
         };
-        let Some(owner_template) = self.templates.get(&root.model_name) else {
+        let Some(owner_template) = self.templates.get(&owner_model) else {
             self.errors.push(diag(
                 location,
-                format!("unknown state model '{}'", root.model_name),
+                format!("unknown state model '{owner_model}'"),
             ));
             return malformed_insert(location);
         };

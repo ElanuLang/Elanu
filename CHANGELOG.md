@@ -4,6 +4,8 @@
 
 ### Language and semantics
 
+- Extended existing-designation structural insertion/removal to mutable membership owned by exact runtime-selected modeled identities carried through persistent live designations.
+- Dynamic-owner structural edits remain non-owning and compose transactionally with independent lifetime provenance transfer.
 - Added bounded lifetime provenance transfer with `transfer target from sourceOwner to destinationOwner` for existing committed dynamic leaf children.
 - Transfer preserves exact child identity, persistent designation targets, writable authority, and all structural memberships while transactionally replacing only the authoritative root owner.
 - The source owner must prove current provenance; the destination must be a live modeled identity; subtree transfer, implicit structural reparenting, and general ownership/borrowing remain unselected.

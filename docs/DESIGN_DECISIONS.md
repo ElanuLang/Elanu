@@ -1226,6 +1226,26 @@ Sequence positions are structural locations, not independent logical state ident
 
 Therefore reorder changes structure without changing the identities designated by `live T` elements.
 
+## Owner-relative structural mutation follows exact live owner identity
+
+Dynamic-owner application composition established that structural mutation should follow the same
+exact modeled-owner identity already supported by owner-relative reads and writable member grants.
+For supported mutable `[live T]` member insertion/removal, the owner may therefore be a statically
+declared modeled root or an exact current modeled identity carried by persistent `live T` / present
+`maybe live T` designation state.
+
+This does not make the owner designation owning, turn membership into lifetime provenance, or grant
+child writable authority. It only selects which existing owner-local structural state identity is
+being mutated. The writable target is resolved through the existing structured runtime designation-
+member authority transport rather than by reconstructing an owner key or generated binding name.
+
+The rule is required for realistic runtime-sized owners. A document whose lifetime is transferred
+between two dynamically selected folders must be able to compose that provenance change with
+independent insertion/removal of the same identity in those exact folders' membership state.
+
+Absent maybe-live owners fail transactionally under the existing designation law. Structural edits
+remain independent from lifetime transfer and continue to preserve duplicate/occurrence semantics.
+
 ## `[live T]` stores designation values, not child ownership
 
 A `[live T]` sequence is an ordered structural value whose elements designate existing live targets.
