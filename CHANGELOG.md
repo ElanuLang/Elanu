@@ -4,6 +4,9 @@
 
 ### Language and semantics
 
+- Added bounded lifetime provenance transfer with `transfer target from sourceOwner to destinationOwner` for existing committed dynamic leaf children.
+- Transfer preserves exact child identity, persistent designation targets, writable authority, and all structural memberships while transactionally replacing only the authoritative root owner.
+- The source owner must prove current provenance; the destination must be a live modeled identity; subtree transfer, implicit structural reparenting, and general ownership/borrowing remain unselected.
 - Creation-scoped fresh child designations may be assigned directly to compatible persistent
   `live T` / `maybe live T` state, preserving the exact fresh identity without structural or
   business-key reconstruction.
@@ -27,6 +30,8 @@
 
 ### Compiler/runtime
 
+- Added transaction-visible dynamic-owner replacement so later lifetime checks in the same action observe staged provenance transfer and rollback discards it cleanly.
+- Reused persistent designation lowering and explicit owner identity transport rather than reconstructing provenance from generated names or structural membership.
 - Carries the ordering key and direction as structured `Expr::Filter` facts through compiler
   rewrites rather than reconstructing or encoding them in generated names/text.
 - Added regression coverage for reactive reordering, stable ties, backing-order preservation,

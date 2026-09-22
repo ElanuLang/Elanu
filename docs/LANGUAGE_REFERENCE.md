@@ -1195,14 +1195,70 @@ designation, but destruction does not generalize the target operand to scoped de
 indexed designation expressions, derived designations, arbitrary expressions, statically
 declared roots, or fresh-child cancellation.
 
-This operation does not introduce ownership transfer, reparenting, cascading destruction,
+This destruction operation does not itself transfer or reparent ownership, and does not introduce cascading destruction,
 garbage collection, reference counting, general references/borrowing, or a general resource
 management system. The source spelling remains provisional; compiler-private lifetime markers
 and carrier representations are not language law.
 
 ---
 
-# 19. Read-only `reduce` — v0.8.0 provisional/implemented
+# 19. Owner-relative child lifetime `transfer` — provisional/implemented
+
+Elanu accepts one narrow operation that changes the lifetime/root provenance of an existing
+committed dynamic **leaf** child without changing that child's identity:
+
+```elanu
+state selected: maybe live Document = none
+
+action moveLifetime {
+    transfer selected from leftFolder to rightFolder
+}
+```
+
+The operation changes only the authoritative lifetime owner. It does **not** insert, remove,
+reorder, or otherwise edit structural membership. Applications that need both facts compose
+`transfer` with ordinary structural edits inside the same action transaction.
+
+Current contract:
+
+- the target must be persistent scalar `live T` or `maybe live T` designation state;
+- `maybe live T` must be present when the statement executes; absence fails the action;
+- the target must designate an existing **committed dynamic leaf child**; fresh transaction-local
+  children, statically declared modeled roots, and children that still root another live child are
+  not accepted by this first surface;
+- the `from` owner must resolve to the child's exact current recorded root-provenance owner;
+- the `to` owner must resolve to an existing live modeled-state identity and must not be the child
+  itself;
+- owner operands may be static modeled roots or persistent live designations, following the same
+  exact-identity owner-proof family used by owner-relative lifetime operations;
+- same-owner transfer is a validated no-op;
+- the exact child identity is unchanged, so persistent designations targeting it remain targeted
+  and already-granted exact writable authority continues to address the same state identities;
+- all structural memberships, including cross-owner and duplicate memberships, are unchanged;
+- a staged transfer is visible to later lifetime operations in the same action: the destination
+  owner immediately proves root provenance and the old owner no longer does;
+- successful transfer commits with the surrounding action; later failure rolls the provenance
+  change back with all other staged state/structural changes.
+
+`transfer` is deliberately separate from structural `move`, `insert`, and `remove`. Structural
+operations do not implicitly reparent lifetime, and lifetime transfer does not infer or perform a
+structural move. This preserves the established distinction between child identity, membership,
+position, designation, lifetime/root provenance, and writable authority.
+
+Elanu currently declares no parent/child model compatibility relation beyond "this is a live
+modeled owner identity." Existing `create T in owner` establishes lifetime provenance independently
+of which `[live T]` members the owner model may contain, and `transfer` preserves that law rather
+than treating membership shape as ownership typing.
+
+This first surface does not introduce subtree transfer, cascading destruction, general ownership
+graphs, ownership-bearing `live T`, borrowing/move semantics for ordinary values, arbitrary
+designation expressions, or implicit reparenting. `transfer`, `from`, and `to` are contextual in
+this bounded statement surface; compiler-private transfer helpers and transaction overlays are not
+language law.
+
+---
+
+# 20. Read-only `reduce` — v0.8.0 provisional/implemented
 
 The current reduction surface is:
 
@@ -1240,7 +1296,7 @@ The current reduction parser/transport still contains bootstrap architecture tha
 
 ---
 
-# 20. Derived `filter` and ordered views — provisional/implemented
+# 21. Derived `filter` and ordered views — provisional/implemented
 
 The base derived-filter surface is:
 
@@ -1320,7 +1376,7 @@ language. Those mechanisms remain unselected.
 
 ---
 
-# 21. Filter → reduction composition — v0.8.0
+# 22. Filter → reduction composition — v0.8.0
 
 Representative end-to-end program shape:
 
@@ -1373,7 +1429,7 @@ derived view itself mutable merely because its value type matches stored members
 
 ---
 
-# 22. What is not currently language surface
+# 23. What is not currently language surface
 
 The current compiler/language should **not** be read as already containing any of the following:
 
@@ -1413,7 +1469,7 @@ Owner-relative creation, structural insertion/removal, owner-relative committed-
 
 ---
 
-# 23. Implementation boundaries are not language law
+# 24. Implementation boundaries are not language law
 
 The current compiler still contains bootstrap mechanisms including preprocessing, generated hidden bindings, specialized lowering passes, compiler-private builtin transport, and older String transports for some structural surfaces.
 

@@ -454,6 +454,67 @@ Boundaries:
 
 Revisit only when realistic composition demonstrates one of those stronger facts is needed.
 
+## Lifetime provenance transfer is independent from structural movement
+
+Folder/document composition established one application fact that cannot be reproduced by
+structural membership edits when the current folder itself is the child's lifetime owner: the
+same existing child identity may need a different exact root-provenance owner.
+
+Decision:
+
+```elanu
+transfer selected from leftFolder to rightFolder
+```
+
+changes only the authoritative root/lifetime provenance of the exact designated committed dynamic
+leaf child. The child identity does not change. Structural membership does not change. Persistent
+`live T` / `maybe live T` designations continue to identify the same child, and exact writable
+authority already granted to child member state continues to address the same state identities.
+
+The `from` operand is an explicit stale-owner proof: it must resolve to the exact owner recorded by
+current transaction-visible provenance. The `to` operand supplies the replacement live modeled owner
+identity. The destination becomes authoritative immediately for later lifetime checks in the same
+shared action transaction, and failure rolls the transfer back. A child that roots another live
+dynamic child is rejected rather than implicitly moving a subtree.
+
+Rationale:
+
+Membership and lifetime provenance have repeatedly composed as separate application facts. A
+combined move-and-reparent operation would make ordinary UI/container vocabulary silently change
+lifetime, while implicit transfer on `insert`/`remove` would contradict established cross-owner
+non-owning membership. Keeping transfer independent lets an application compose provenance and
+structure atomically when both genuinely need to change, while applications with workspace-rooted
+lifetimes need no transfer at all.
+
+A framework can maintain a parallel current-owner key/table, but that duplicates a fact the compiler
+already owns: compiler lifetime operations would otherwise continue to use the original root
+provenance. For applications whose current owner is genuinely a lifetime fact, one compiler-owned
+relation is therefore materially more coherent than reconstructing ownership beside the language.
+
+Alternatives rejected by the supporting pressure:
+
+- treating structural `move` as lifetime reparenting;
+- implicit transfer when membership is inserted or removed;
+- replacing the child with a newly created identity under the destination;
+- a general ownership/borrowing/reference system;
+- subtree migration as part of the first operation.
+
+Boundaries:
+
+- the first surface is limited to existing committed dynamic leaf children selected through
+  persistent scalar `live T` / `maybe live T` state;
+- owner operands follow the current static-root/persistent-live owner-proof family;
+- same-owner transfer is a validated no-op;
+- transfer does not perform structural edits, designation clearing, or authority changes;
+- self-rooting, absent operands, stale source-owner proof, unknown/dead destinations, and rooted
+  descendants fail transactionally;
+- Elanu currently does not infer owner/child compatibility from structural `[live T]` members;
+- no subtree transfer, cascade, fresh-child transfer, ownership graph, or ordinary-value move
+  semantics is selected.
+
+Revisit when composition requires descendant migration, a broader target/owner operand family, or a
+real owner/child compatibility relation that cannot remain independent of structural membership.
+
 ## Persistent designation membership is a read-only child-identity relation
 
 The current-view reconciliation pressure established a second fact that is distinct
