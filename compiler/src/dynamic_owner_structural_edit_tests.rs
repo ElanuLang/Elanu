@@ -1,5 +1,5 @@
-use crate::runtime::{Runtime, Value};
 use crate::check_source_with_runtime_models;
+use crate::runtime::{Runtime, Value};
 
 fn runtime(source: &str) -> Runtime {
     let checked = check_source_with_runtime_models(source).expect("source should check");

@@ -39,7 +39,7 @@ pub fn lower(
     let mut indexed_source_models = collect_model_sequence_types(program);
     indexed_source_models.extend(collect_filter_view_types(program));
     let designation_models = collect_persistent_designation_models(program);
-    if indexed_source_models.is_empty() {
+    if indexed_source_models.is_empty() && designation_models.is_empty() {
         return Ok(program.clone());
     }
 
