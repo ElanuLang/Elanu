@@ -143,8 +143,11 @@ pub fn check_source_with_runtime_models(source: &str) -> Result<CheckedSource, V
     let existing_insert_finalized =
         existing_designation_insert_surface::finalize(&runtime_live_lowered)?;
     let runtime_lowered = model_lowering::lower(&existing_insert_finalized)?;
-    let runtime_realized =
-        runtime_sequence_realization::lower(&runtime_lowered, &runtime_reduction_types)?;
+    let runtime_realized = runtime_sequence_realization::lower(
+        &runtime_lowered,
+        &runtime_reduction_types,
+        &externalized_sequences,
+    )?;
     let checked = semantic::check_with_runtime_reductions(
         &runtime_realized.program,
         runtime_realized.runtime_reductions,
