@@ -94,7 +94,10 @@ fn transfer_changes_only_root_provenance_and_preserves_identity_and_membership()
     })
     .expect("leaf provenance transfer should commit");
 
-    assert_eq!(runtime.dynamic_model_owners.get(&identity), Some(&"right".to_string()));
+    assert_eq!(
+        runtime.dynamic_model_owners.get(&identity),
+        Some(&"right".to_string())
+    );
     assert_eq!(
         runtime.value("__meld_live$selected").unwrap(),
         Value::String(identity.clone())
@@ -145,7 +148,9 @@ fn staged_transfer_changes_rooting_proof_for_later_lifetime_work() {
     let old_owner_error = runtime
         .terminate_runtime_model(&identity, "left")
         .expect_err("old owner must stop proving lifetime authority immediately");
-    assert!(old_owner_error.message.contains("requires rooting owner 'right'"));
+    assert!(old_owner_error
+        .message
+        .contains("requires rooting owner 'right'"));
 
     runtime
         .terminate_runtime_model(&identity, "right")
@@ -188,9 +193,15 @@ fn transfer_rejects_non_leaf_child() {
     let descendant = runtime
         .instantiate_runtime_model("Document", &identity)
         .expect("child should be usable as a runtime owner");
-    let created = runtime.transaction.take().expect("transaction should exist");
+    let created = runtime
+        .transaction
+        .take()
+        .expect("transaction should exist");
     runtime.commit(created);
-    assert_eq!(runtime.dynamic_model_owners.get(&descendant), Some(&identity));
+    assert_eq!(
+        runtime.dynamic_model_owners.get(&descendant),
+        Some(&identity)
+    );
 
     let error = run_test_transaction(&mut runtime, |runtime| {
         runtime.transfer_runtime_model_owner(&identity, "left", "right")
@@ -214,13 +225,17 @@ fn transfer_rejects_self_rooting_and_unknown_destination() {
         runtime.transfer_runtime_model_owner(&identity, "left", &identity)
     })
     .expect_err("child cannot become its own lifetime root");
-    assert!(self_error.message.contains("cannot become its own rooting owner"));
+    assert!(self_error
+        .message
+        .contains("cannot become its own rooting owner"));
 
     let missing_error = run_test_transaction(&mut runtime, |runtime| {
         runtime.transfer_runtime_model_owner(&identity, "left", "missing")
     })
     .expect_err("destination owner must be live");
-    assert!(missing_error.message.contains("unknown modeled-state destination owner"));
+    assert!(missing_error
+        .message
+        .contains("unknown modeled-state destination owner"));
 }
 
 #[test]
