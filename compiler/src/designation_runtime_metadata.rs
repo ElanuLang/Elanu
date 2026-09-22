@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::ast::{decode_live_type_name, decode_maybe_live_type_name, Declaration, Program};
+use crate::runtime_model_templates::{RuntimeModelRoot, RuntimeModelTemplate};
 
 pub(crate) const LOWERED_DESIGNATION_PREFIX: &str = "__meld_live$";
 
@@ -35,4 +36,26 @@ pub(crate) fn collect(program: &Program) -> HashMap<String, RuntimeDesignationMe
             ))
         })
         .collect()
+}
+
+pub(crate) fn collect_model_members(
+    roots: &HashMap<String, RuntimeModelRoot>,
+    templates: &HashMap<String, RuntimeModelTemplate>,
+) -> HashMap<String, RuntimeDesignationMetadata> {
+    let mut designations = HashMap::new();
+    for root in roots.values() {
+        let Some(template) = templates.get(&root.model_name) else {
+            continue;
+        };
+        for member in &template.members {
+            let Some(metadata) = &member.designation else {
+                continue;
+            };
+            designations.insert(
+                format!("__meld_sm${}${}", root.name, member.name),
+                metadata.clone(),
+            );
+        }
+    }
+    designations
 }

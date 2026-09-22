@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::ast::{Declaration, Expr, Program, StateModelDecl, StateModelMember};
+use crate::designation_runtime_metadata::RuntimeDesignationMetadata;
 use crate::diagnostic::Diagnostic;
 use crate::model_types;
 use crate::semantic::ValueType;
@@ -24,6 +25,7 @@ pub struct RuntimeModelMemberTemplate {
     pub name: String,
     pub kind: RuntimeModelMemberKind,
     pub value_type: ValueType,
+    pub(crate) designation: Option<RuntimeDesignationMetadata>,
     pub expression: Expr,
 }
 
@@ -76,6 +78,12 @@ pub fn collect(
                     .member_type(&name)
                     .expect("validated state-model member should have a shared value type")
                     .clone();
+                let designation = resolved.member_designation(&name).map(|designation| {
+                    RuntimeDesignationMetadata {
+                        model_name: designation.model_name.clone(),
+                        allows_none: designation.allows_none,
+                    }
+                });
 
                 let (kind, mut expression) = match member {
                     StateModelMember::State(state) => {
@@ -85,6 +93,10 @@ pub fn collect(
                         (RuntimeModelMemberKind::Derived, derived.expression.clone())
                     }
                 };
+
+                if designation.is_some() {
+                    expression = Expr::String(String::new());
+                }
 
                 if let Expr::Filter {
                     source,
@@ -107,6 +119,7 @@ pub fn collect(
                     name,
                     kind,
                     value_type,
+                    designation,
                     expression,
                 }
             })

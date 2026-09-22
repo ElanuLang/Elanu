@@ -146,7 +146,12 @@ pub fn check_source_with_runtime_models(source: &str) -> Result<CheckedSource, V
     // accumulator law plus owner/element model schemas. Static typing no longer
     // depends on choosing a representative concrete live target.
     let runtime_reduction_types = runtime_reduction_typing::check(&runtime_reduction_lowered)?;
-    let runtime_designations = designation_runtime_metadata::collect(&runtime_reduction_lowered);
+    let mut runtime_designations =
+        designation_runtime_metadata::collect(&runtime_reduction_lowered);
+    runtime_designations.extend(designation_runtime_metadata::collect_model_members(
+        &runtime_model_roots,
+        &runtime_model_templates,
+    ));
 
     let runtime_live_lowered = live_designation_lowering::lower(
         &runtime_reduction_lowered,

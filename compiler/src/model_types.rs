@@ -1,6 +1,8 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
-use crate::ast::{Expr, SourceLocation, StateModelDecl, StateModelMember};
+use crate::ast::{
+    decode_maybe_live_type_name, Expr, SourceLocation, StateModelDecl, StateModelMember,
+};
 use crate::diagnostic::Diagnostic;
 use crate::semantic::{
     assignable_to, binary_result_type, common_type, parse_primitive_type_name, show_type,
@@ -8,14 +10,25 @@ use crate::semantic::{
 };
 use crate::sequence_surface::{decode_sequence_literal, decode_sequence_live_type};
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ModelDesignationType {
+    pub(crate) model_name: String,
+    pub(crate) allows_none: bool,
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct ModelTypeInfo {
     member_types: HashMap<String, ValueType>,
+    member_designations: HashMap<String, ModelDesignationType>,
 }
 
 impl ModelTypeInfo {
     pub(crate) fn member_type(&self, name: &str) -> Option<&ValueType> {
         self.member_types.get(name)
+    }
+
+    pub(crate) fn member_designation(&self, name: &str) -> Option<&ModelDesignationType> {
+        self.member_designations.get(name)
     }
 }
 
@@ -42,6 +55,10 @@ impl ModelTypeFacts {
 pub(crate) fn resolve(declarations: &[StateModelDecl]) -> Result<ModelTypeFacts, Vec<Diagnostic>> {
     let mut errors = Vec::new();
     let mut models = HashMap::new();
+    let known_models = declarations
+        .iter()
+        .map(|model| model.name.clone())
+        .collect::<HashSet<_>>();
 
     for model in declarations {
         if parse_primitive_type_name(&model.name).is_some() {
@@ -63,7 +80,7 @@ pub(crate) fn resolve(declarations: &[StateModelDecl]) -> Result<ModelTypeFacts,
             continue;
         }
 
-        let info = resolve_model(model, &mut errors);
+        let info = resolve_model(model, &known_models, &mut errors);
         models.insert(model.name.clone(), info);
     }
 
@@ -74,8 +91,13 @@ pub(crate) fn resolve(declarations: &[StateModelDecl]) -> Result<ModelTypeFacts,
     }
 }
 
-fn resolve_model(model: &StateModelDecl, errors: &mut Vec<Diagnostic>) -> ModelTypeInfo {
+fn resolve_model(
+    model: &StateModelDecl,
+    known_models: &HashSet<String>,
+    errors: &mut Vec<Diagnostic>,
+) -> ModelTypeInfo {
     let mut member_types = HashMap::new();
+    let mut member_designations = HashMap::new();
 
     for member in &model.members {
         let name = member.name().to_string();
@@ -92,6 +114,7 @@ fn resolve_model(model: &StateModelDecl, errors: &mut Vec<Diagnostic>) -> ModelT
             continue;
         }
 
+        let mut designation = None;
         let (expression, declared_type) = match member {
             StateModelMember::State(state) => {
                 let declared_type = state.type_name.as_deref().and_then(|type_name| {
@@ -100,6 +123,22 @@ fn resolve_model(model: &StateModelDecl, errors: &mut Vec<Diagnostic>) -> ModelT
                     }
                     if let Some(element_model) = decode_sequence_live_type(type_name) {
                         return Some(ValueType::SequenceLive(element_model.to_string()));
+                    }
+                    if let Some(target_model) = decode_maybe_live_type_name(type_name) {
+                        if !known_models.contains(target_model) {
+                            errors.push(diag(
+                                state.location,
+                                format!(
+                                    "model-local maybe live designation '{}.{}' names unknown state model '{}'",
+                                    model.name, state.name, target_model
+                                ),
+                            ));
+                        }
+                        designation = Some(ModelDesignationType {
+                            model_name: target_model.to_string(),
+                            allows_none: true,
+                        });
+                        return Some(ValueType::String);
                     }
                     errors.push(diag(
                         state.location,
@@ -115,13 +154,38 @@ fn resolve_model(model: &StateModelDecl, errors: &mut Vec<Diagnostic>) -> ModelT
             StateModelMember::Derived(derived) => (&derived.expression, None),
         };
 
-        let inferred = match (&declared_type, expression) {
-            (Some(ValueType::SequenceLive(_)), Expr::String(value))
-                if decode_sequence_literal(value).is_some() =>
-            {
-                declared_type.clone()
+        if designation.is_none()
+            && expression_references_designation(expression, &member_designations)
+        {
+            errors.push(diag(
+                location,
+                format!(
+                    "state-model member '{}.{}' cannot use a model-local live designation as an ordinary value",
+                    model.name, name
+                ),
+            ));
+        }
+
+        let inferred = if designation.is_some() {
+            if !matches!(expression, Expr::Name(value) if value == "none") {
+                errors.push(diag(
+                    location,
+                    format!(
+                        "model-local maybe live designation '{}.{}' currently requires initializer 'none'",
+                        model.name, name
+                    ),
+                ));
             }
-            _ => infer_model_expr_type(expression, &member_types, model, location, errors),
+            Some(ValueType::String)
+        } else {
+            match (&declared_type, expression) {
+                (Some(ValueType::SequenceLive(_)), Expr::String(value))
+                    if decode_sequence_literal(value).is_some() =>
+                {
+                    declared_type.clone()
+                }
+                _ => infer_model_expr_type(expression, &member_types, model, location, errors),
+            }
         };
 
         let value_type = match (declared_type, inferred) {
@@ -145,10 +209,46 @@ fn resolve_model(model: &StateModelDecl, errors: &mut Vec<Diagnostic>) -> ModelT
             (None, None) => ValueType::Int,
         };
 
+        if let Some(designation) = designation {
+            member_designations.insert(name.clone(), designation);
+        }
         member_types.insert(name, value_type);
     }
 
-    ModelTypeInfo { member_types }
+    ModelTypeInfo {
+        member_types,
+        member_designations,
+    }
+}
+
+fn expression_references_designation(
+    expression: &Expr,
+    designations: &HashMap<String, ModelDesignationType>,
+) -> bool {
+    match expression {
+        Expr::Name(name) => designations.contains_key(name),
+        Expr::Binary { left, right, .. } => {
+            expression_references_designation(left, designations)
+                || expression_references_designation(right, designations)
+        }
+        Expr::If {
+            condition,
+            then_branch,
+            else_branch,
+        } => {
+            expression_references_designation(condition, designations)
+                || expression_references_designation(then_branch, designations)
+                || expression_references_designation(else_branch, designations)
+        }
+        Expr::IndexedMember { index, .. } | Expr::IndexedDesignation { index, .. } => {
+            expression_references_designation(index, designations)
+        }
+        Expr::Filter { source, .. } => expression_references_designation(source, designations),
+        Expr::RuntimeIndexMember { .. }
+        | Expr::RuntimeIndexDesignation { .. }
+        | Expr::RuntimeDesignationMember { .. } => false,
+        Expr::Integer(_) | Expr::Float(_) | Expr::Bool(_) | Expr::String(_) => false,
+    }
 }
 
 fn infer_model_expr_type(
