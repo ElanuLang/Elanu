@@ -1208,7 +1208,7 @@ and carrier representations are not language law.
 # 19. Owner-relative child lifetime `transfer` — provisional/implemented
 
 Elanu accepts one narrow operation that changes the lifetime/root provenance of an existing
-committed dynamic **leaf** child without changing that child's identity:
+committed dynamic child without changing that child's identity:
 
 ```elanu
 state selected: maybe live Document = none
@@ -1226,12 +1226,14 @@ Current contract:
 
 - the target must be persistent scalar `live T` or `maybe live T` designation state;
 - `maybe live T` must be present when the statement executes; absence fails the action;
-- the target must designate an existing **committed dynamic leaf child**; fresh transaction-local
-  children, statically declared modeled roots, and children that still root another live child are
-  not accepted by this first surface;
+- the target must designate an existing committed dynamic child; fresh transaction-local children
+  and statically declared modeled roots are not accepted by this surface;
+- the target may itself root live dynamic descendants; transfer changes only the target's own
+  parent/root-provenance edge and leaves descendant provenance unchanged;
 - the `from` owner must resolve to the child's exact current recorded root-provenance owner;
 - the `to` owner must resolve to an existing live modeled-state identity and must not be the child
-  itself;
+  itself or any transaction-visible descendant of that child; the resulting provenance relation must
+  remain acyclic;
 - owner operands may be static modeled roots or persistent live designations, following the same
   exact-identity owner-proof family used by owner-relative lifetime operations;
 - same-owner transfer is a validated no-op;
@@ -1253,11 +1255,12 @@ modeled owner identity." Existing `create T in owner` establishes lifetime prove
 of which `[live T]` members the owner model may contain, and `transfer` preserves that law rather
 than treating membership shape as ownership typing.
 
-This first surface does not introduce subtree transfer, cascading destruction, general ownership
-graphs, ownership-bearing `live T`, borrowing/move semantics for ordinary values, arbitrary
-designation expressions, or implicit reparenting. `transfer`, `from`, and `to` are contextual in
-this bounded statement surface; compiler-private transfer helpers and transaction overlays are not
-language law.
+This surface does not introduce descendant provenance migration, cascading destruction, a public
+ownership-graph API, ownership-bearing `live T`, borrowing/move semantics for ordinary values,
+arbitrary designation expressions, or implicit reparenting. A non-leaf transfer preserves the
+existing descendant-to-owner edges; it is not subtree migration. `transfer`, `from`, and `to` are
+contextual in this bounded statement surface; compiler-private transfer helpers and transaction
+overlays are not language law.
 
 ---
 

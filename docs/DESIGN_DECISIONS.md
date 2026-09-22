@@ -467,15 +467,17 @@ transfer selected from leftFolder to rightFolder
 ```
 
 changes only the authoritative root/lifetime provenance of the exact designated committed dynamic
-leaf child. The child identity does not change. Structural membership does not change. Persistent
+identity. The child identity does not change. Structural membership does not change. Persistent
 `live T` / `maybe live T` designations continue to identify the same child, and exact writable
 authority already granted to child member state continues to address the same state identities.
 
 The `from` operand is an explicit stale-owner proof: it must resolve to the exact owner recorded by
 current transaction-visible provenance. The `to` operand supplies the replacement live modeled owner
 identity. The destination becomes authoritative immediately for later lifetime checks in the same
-shared action transaction, and failure rolls the transfer back. A child that roots another live
-dynamic child is rejected rather than implicitly moving a subtree.
+shared action transaction, and failure rolls the transfer back. The transferred identity may itself
+root live descendants; their existing provenance edges remain unchanged. The destination owner chain
+must not reach the transferred identity, so the transaction-visible provenance relation remains
+acyclic.
 
 Rationale:
 
@@ -501,19 +503,22 @@ Alternatives rejected by the supporting pressure:
 
 Boundaries:
 
-- the first surface is limited to existing committed dynamic leaf children selected through
-  persistent scalar `live T` / `maybe live T` state;
+- the surface is limited to existing committed dynamic identities selected through persistent scalar
+  `live T` / `maybe live T` state;
 - owner operands follow the current static-root/persistent-live owner-proof family;
 - same-owner transfer is a validated no-op;
-- transfer does not perform structural edits, designation clearing, or authority changes;
-- self-rooting, absent operands, stale source-owner proof, unknown/dead destinations, and rooted
-  descendants fail transactionally;
+- transfer does not perform structural edits, designation clearing, authority changes, or descendant
+  provenance rewriting;
+- self-rooting, absent operands, stale source-owner proof, unknown/dead destinations, and any
+  destination ancestry that would create a transaction-visible provenance cycle fail transactionally;
 - Elanu currently does not infer owner/child compatibility from structural `[live T]` members;
-- no subtree transfer, cascade, fresh-child transfer, ownership graph, or ordinary-value move
-  semantics is selected.
+- no descendant migration, cascade, fresh-child transfer, public ownership graph, or ordinary-value
+  move semantics is selected;
+- non-leaf destruction remains a separate unresolved question and `destroy` remains leaf-only.
 
-Revisit when composition requires descendant migration, a broader target/owner operand family, or a
-real owner/child compatibility relation that cannot remain independent of structural membership.
+Revisit when composition requires descendant migration, non-leaf destruction policy, a broader
+operand family, or a real owner/child compatibility relation that cannot remain independent of
+structural membership.
 
 ## Persistent designation membership is a read-only child-identity relation
 
