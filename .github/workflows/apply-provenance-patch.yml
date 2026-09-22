@@ -1,0 +1,130 @@
+name: Apply provenance patch
+
+on:
+  push:
+    branches:
+      - preserve-model-sequence-provenance
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: preserve-model-sequence-provenance
+      - name: Apply focused compiler patch
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              text = path.read_text()
+              if old not in text:
+                  return False
+              if text.count(old) != 1:
+                  raise SystemExit(f"expected one match in {path}: {old[:80]!r}")
+              path.write_text(text.replace(old, new, 1))
+              return True
+
+          model = Path("compiler/src/model_sequence_integration.rs")
+          seq = Path("compiler/src/sequence_lowering.rs")
+          lib = Path("compiler/src/lib.rs")
+
+          replace_once(
+              model,
+              'pub(crate) const MODEL_SEQUENCE_BINDING_PREFIX: &str = "__meld_mseq$";\n\n#[derive(Debug, Clone)]\nstruct SequenceMemberSpec {',
+              'pub(crate) const MODEL_SEQUENCE_BINDING_PREFIX: &str = "__meld_mseq$";\n\n#[derive(Debug, Clone, PartialEq, Eq)]\npub(crate) struct ExternalizedModelSequence {\n    pub(crate) owner_root: String,\n    pub(crate) owner_model: String,\n    pub(crate) member_name: String,\n    pub(crate) element_model: String,\n}\n\n#[derive(Debug, Clone)]\npub(crate) struct ModelSequenceLowering {\n    pub(crate) program: Program,\n    pub(crate) externalized_sequences: HashMap<String, ExternalizedModelSequence>,\n}\n\n#[derive(Debug, Clone)]\nstruct SequenceMemberSpec {'
+          )
+          replace_once(
+              model,
+              'pub fn lower(program: &Program) -> Result<Program, Vec<Diagnostic>> {',
+              'pub fn lower(program: &Program) -> Result<ModelSequenceLowering, Vec<Diagnostic>> {'
+          )
+          replace_once(
+              model,
+              '        return if errors.is_empty() {\n            Ok(program.clone())\n        } else {',
+              '        return if errors.is_empty() {\n            Ok(ModelSequenceLowering {\n                program: program.clone(),\n                externalized_sequences: HashMap::new(),\n            })\n        } else {'
+          )
+          replace_once(
+              model,
+              '    let root_members = collect_root_members(&facts, &specs);\n    let path_rewrites: HashMap<String, String> = root_members',
+              '    let root_members = collect_root_members(&facts, &specs);\n    let externalized_sequences: HashMap<String, ExternalizedModelSequence> = root_members\n        .iter()\n        .flat_map(|(root, members)| {\n            let owner_model = facts\n                .modeled_state_roots()\n                .iter()\n                .find(|candidate| candidate.name == *root)\n                .map(|candidate| candidate.model_name.clone())\n                .expect("externalized model-sequence root must retain modeled-root facts");\n            members.iter().map(move |member| {\n                let binding_name = model_sequence_binding_name(root, &member.member_name);\n                let element_model = decode_sequence_live_type(&member.encoded_type_name)\n                    .expect("externalized model-sequence type must remain [live T]")\n                    .to_string();\n                (\n                    binding_name,\n                    ExternalizedModelSequence {\n                        owner_root: root.clone(),\n                        owner_model: owner_model.clone(),\n                        member_name: member.member_name.clone(),\n                        element_model,\n                    },\n                )\n            })\n        })\n        .collect();\n    let path_rewrites: HashMap<String, String> = root_members'
+          )
+          replace_once(
+              model,
+              '    Ok(Program {\n        declarations,\n        state_models,\n    })',
+              '    Ok(ModelSequenceLowering {\n        program: Program {\n            declarations,\n            state_models,\n        },\n        externalized_sequences,\n    })'
+          )
+
+          replace_once(
+              seq,
+              'use crate::model_sequence_integration::MODEL_SEQUENCE_BINDING_PREFIX;',
+              'use crate::model_sequence_integration::ExternalizedModelSequence;'
+          )
+          replace_once(
+              seq,
+              '    variants: Vec<SequenceVariant>,\n}',
+              '    variants: Vec<SequenceVariant>,\n    externalized_model_member: bool,\n}'
+          )
+          replace_once(
+              seq,
+              'pub fn lower(\n    program: &Program,\n    runtime_model_templates: &HashMap<String, RuntimeModelTemplate>,\n) -> Result<Program, Vec<Diagnostic>> {',
+              'pub fn lower(\n    program: &Program,\n    runtime_model_templates: &HashMap<String, RuntimeModelTemplate>,\n    externalized_sequences: &HashMap<String, ExternalizedModelSequence>,\n) -> Result<Program, Vec<Diagnostic>> {'
+          )
+          replace_once(
+              seq,
+              '    let sequences = collect_sequences(program, models, roots, &mut errors);',
+              '    let sequences = collect_sequences(\n        program,\n        models,\n        roots,\n        externalized_sequences,\n        &mut errors,\n    );'
+          )
+          replace_once(
+              seq,
+              'fn collect_sequences(\n    program: &Program,\n    models: &HashMap<String, ModelInfo>,\n    roots: &[RootInfo],\n    errors: &mut Vec<Diagnostic>,\n) -> HashMap<String, SequenceInfo> {',
+              'fn collect_sequences(\n    program: &Program,\n    models: &HashMap<String, ModelInfo>,\n    roots: &[RootInfo],\n    externalized_sequences: &HashMap<String, ExternalizedModelSequence>,\n    errors: &mut Vec<Diagnostic>,\n) -> HashMap<String, SequenceInfo> {'
+          )
+          replace_once(
+              seq,
+              '        collect_assignment_variants(\n            &program.declarations,\n            &state.name,\n            model_name,\n            &candidates,\n            &mut variants,\n            errors,\n        );\n\n        result.insert(',
+              '        collect_assignment_variants(\n            &program.declarations,\n            &state.name,\n            model_name,\n            &candidates,\n            &mut variants,\n            errors,\n        );\n\n        let externalized = externalized_sequences.get(&state.name);\n        if let Some(provenance) = externalized {\n            if provenance.element_model != model_name {\n                errors.push(diag(\n                    state.location,\n                    format!(\n                        "internal model-sequence provenance mismatch for '{}.{}' on root '{}': owner model '{}' records live {} but binding '{}' has live {}",\n                        provenance.owner_model,\n                        provenance.member_name,\n                        provenance.owner_root,\n                        provenance.owner_model,\n                        provenance.element_model,\n                        state.name,\n                        model_name\n                    ),\n                ));\n            }\n        }\n\n        result.insert('
+          )
+          replace_once(
+              seq,
+              '                candidates,\n                variants,\n            },',
+              '                candidates,\n                variants,\n                externalized_model_member: externalized.is_some(),\n            },'
+          )
+          text = seq.read_text()
+          text = text.replace('info.name.starts_with(MODEL_SEQUENCE_BINDING_PREFIX)', 'info.externalized_model_member')
+          text = text.replace('!info.name.starts_with(MODEL_SEQUENCE_BINDING_PREFIX)', '!info.externalized_model_member')
+          if 'MODEL_SEQUENCE_BINDING_PREFIX' in text:
+              raise SystemExit('sequence_lowering still reconstructs model-sequence role from generated prefix')
+          seq.write_text(text)
+
+          replace_once(
+              lib,
+              '#[cfg(test)]\nmod relative_navigation_pressure;',
+              '#[cfg(test)]\nmod model_sequence_provenance_tests;\n#[cfg(test)]\nmod relative_navigation_pressure;'
+          )
+          replace_once(
+              lib,
+              '    let model_sequence_lowered = model_sequence_integration::lower(&filter_prepared)?;\n    let runtime_index_grants =\n        runtime_index_grant_transport::lower(&model_sequence_lowered, &runtime_model_templates)?;\n    let sequence_lowered =\n        sequence_lowering::lower(&runtime_index_grants, &runtime_model_templates)?;',
+              '    let model_sequence_integration::ModelSequenceLowering {\n        program: model_sequence_lowered,\n        externalized_sequences,\n    } = model_sequence_integration::lower(&filter_prepared)?;\n    let runtime_index_grants =\n        runtime_index_grant_transport::lower(&model_sequence_lowered, &runtime_model_templates)?;\n    let sequence_lowered = sequence_lowering::lower(\n        &runtime_index_grants,\n        &runtime_model_templates,\n        &externalized_sequences,\n    )?;'
+          )
+
+          test = Path("compiler/src/model_sequence_provenance_tests.rs")
+          test.write_text('''use crate::{model_sequence_integration, parse_source};\n\n#[test]\nfn externalized_model_sequences_preserve_owner_and_member_provenance() {\n    let source = r#"\nstate model Task {\n    state title = ""\n}\n\nstate model Project {\n    state tasks: [live Task] = []\n}\n\nstate projectA: Project\nstate projectB: Project\n"#;\n\n    let program = parse_source(source).expect("source should parse");\n    let lowered = model_sequence_integration::lower(&program).expect("integration should lower");\n\n    let mut provenance: Vec<_> = lowered.externalized_sequences.values().collect();\n    provenance.sort_by(|left, right| left.owner_root.cmp(&right.owner_root));\n\n    assert_eq!(provenance.len(), 2);\n    assert_eq!(provenance[0].owner_root, "projectA");\n    assert_eq!(provenance[0].owner_model, "Project");\n    assert_eq!(provenance[0].member_name, "tasks");\n    assert_eq!(provenance[0].element_model, "Task");\n    assert_eq!(provenance[1].owner_root, "projectB");\n    assert_eq!(provenance[1].owner_model, "Project");\n    assert_eq!(provenance[1].member_name, "tasks");\n    assert_eq!(provenance[1].element_model, "Task");\n}\n''')
+      - name: Format and commit patch
+        run: |
+          cd compiler
+          cargo fmt
+          cd ..
+          if git diff --quiet; then
+            echo "No patch changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add compiler/src/model_sequence_integration.rs compiler/src/model_sequence_provenance_tests.rs compiler/src/sequence_lowering.rs compiler/src/lib.rs
+          git commit -m "Preserve model sequence provenance across lowering"
+          git push origin HEAD:preserve-model-sequence-provenance
