@@ -1,0 +1,32 @@
+name: Model-local designation runtime experiment
+
+on:
+  push:
+    branches:
+      - model-local-maybe-live-runtime-experiment
+
+permissions:
+  contents: write
+
+jobs:
+  experiment:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: model-local-maybe-live-runtime-experiment
+      - name: Register focused runtime experiment
+        run: python .github/scripts/register_model_local_designation_experiment.py
+      - name: Format and run focused tests
+        run: |
+          cd compiler
+          cargo fmt
+          cargo test runtime::model_local_designation_experiment -- --nocapture
+          cd ..
+      - name: Commit runtime experiment registration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add compiler/src/runtime.rs compiler/src/runtime/model_local_designation_experiment.rs
+          git commit -m "Pressure-test model-local optional designation runtime composition"
+          git push origin HEAD:model-local-maybe-live-runtime-experiment
