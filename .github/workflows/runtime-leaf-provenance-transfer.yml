@@ -1,0 +1,30 @@
+name: Runtime leaf provenance transfer patch
+
+on:
+  push:
+    branches:
+      - runtime-leaf-provenance-transfer
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: runtime-leaf-provenance-transfer
+      - name: Apply bounded runtime experiment
+        run: python .github/scripts/apply_runtime_provenance_transfer.py
+      - name: Format, test focused runtime semantics, and commit
+        run: |
+          cd compiler
+          cargo fmt
+          cargo test provenance_transfer_execution -- --nocapture
+          cd ..
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add compiler/src/runtime.rs compiler/src/runtime/provenance_transfer_execution.rs
+          git commit -m "Stage leaf model provenance transfer in runtime"
+          git push origin HEAD:runtime-leaf-provenance-transfer
