@@ -4,6 +4,8 @@ mod designation_runtime_metadata;
 pub mod diagnostic;
 #[cfg(test)]
 mod dynamic_owner_structural_edit_tests;
+#[cfg(test)]
+mod nested_folder_composition_tests;
 mod existing_designation_insert_surface;
 mod filter_integration;
 pub mod lexer;
