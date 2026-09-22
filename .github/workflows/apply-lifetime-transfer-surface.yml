@@ -1,0 +1,32 @@
+name: Apply lifetime transfer surface
+
+on:
+  push:
+    branches:
+      - leaf-provenance-transfer-surface
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: leaf-provenance-transfer-surface
+      - name: Apply bounded transfer surface
+        run: python .github/scripts/apply_lifetime_transfer_surface.py
+      - name: Format and run focused tests
+        run: |
+          cd compiler
+          cargo fmt
+          cargo test lifetime_transfer_surface::tests -- --nocapture
+          cd ..
+      - name: Commit implementation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add compiler/src/lib.rs compiler/src/live_designation_lowering.rs compiler/src/runtime.rs docs/LANGUAGE_REFERENCE.md docs/DESIGN_DECISIONS.md CHANGELOG.md
+          git commit -m "Add bounded lifetime provenance transfer surface"
+          git push origin HEAD:leaf-provenance-transfer-surface
