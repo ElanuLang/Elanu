@@ -1,0 +1,179 @@
+name: Refactor designation sequence resolution
+
+on:
+  push:
+    branches:
+      - refactor-designation-sequence-resolution
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor-designation-sequence-resolution
+      - name: Apply bounded refactor
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('compiler/src/sequence_lowering.rs')
+          text = path.read_text()
+
+          old = '''fn designation_sequence_member_source(
+    source: &str,
+    context: &LoweringContext<'_>,
+) -> Option<(Expr, String)> {
+    let (designation, member) = source.split_once('.')?;
+    if designation.is_empty() || member.is_empty() || member.contains('.') {
+        return None;
+    }
+
+    let (owner_model, _) = context.designation_models.get(designation)?;
+    let member_template = context
+        .runtime_model_templates
+        .get(owner_model)?
+        .member(member)?;
+
+    let ValueType::SequenceLive(element_model) = &member_template.value_type else {
+        return None;
+    };
+
+    Some((
+        Expr::RuntimeDesignationMember {
+            designation: Box::new(Expr::Name(designation.to_string())),
+            member: member.to_string(),
+            element_model: owner_model.clone(),
+            member_type_name: runtime_value_type_name(&member_template.value_type),
+        },
+        element_model.clone(),
+    ))
+}
+
+fn designation_sequence_member_model(
+    source: &str,
+    context: &LoweringContext<'_>,
+) -> Option<String> {
+    designation_sequence_member_source(source, context).map(|(_, model)| model)
+}
+'''
+
+          new = '''#[derive(Debug, Clone)]
+struct DesignationSequenceMember {
+    designation: String,
+    member: String,
+    owner_model: String,
+    element_model: String,
+    member_type_name: String,
+}
+
+impl DesignationSequenceMember {
+    fn runtime_source(&self) -> Expr {
+        Expr::RuntimeDesignationMember {
+            designation: Box::new(Expr::Name(self.designation.clone())),
+            member: self.member.clone(),
+            element_model: self.owner_model.clone(),
+            member_type_name: self.member_type_name.clone(),
+        }
+    }
+}
+
+fn resolve_designation_sequence_member(
+    source: &str,
+    context: &LoweringContext<'_>,
+) -> Option<DesignationSequenceMember> {
+    let (designation, member) = source.split_once('.')?;
+    if designation.is_empty() || member.is_empty() || member.contains('.') {
+        return None;
+    }
+
+    let (owner_model, _) = context.designation_models.get(designation)?;
+    let member_template = context
+        .runtime_model_templates
+        .get(owner_model)?
+        .member(member)?;
+
+    let ValueType::SequenceLive(element_model) = &member_template.value_type else {
+        return None;
+    };
+
+    Some(DesignationSequenceMember {
+        designation: designation.to_string(),
+        member: member.to_string(),
+        owner_model: owner_model.clone(),
+        element_model: element_model.clone(),
+        member_type_name: runtime_value_type_name(&member_template.value_type),
+    })
+}
+
+fn designation_sequence_member_model(
+    source: &str,
+    context: &LoweringContext<'_>,
+) -> Option<String> {
+    resolve_designation_sequence_member(source, context).map(|resolved| resolved.element_model)
+}
+'''
+
+          if text.count(old) != 1:
+              raise SystemExit('expected designation sequence helper block exactly once')
+          text = text.replace(old, new, 1)
+
+          old = '''    if let Some((source, element_model)) = designation_sequence_member_source(source, context) {
+        return Expr::RuntimeIndexDesignation {
+            source: Box::new(source),
+            index: Box::new(lower_expr(index, location, context, errors)),
+            element_model,
+        };
+    }
+'''
+          new = '''    if let Some(resolved) = resolve_designation_sequence_member(source, context) {
+        return Expr::RuntimeIndexDesignation {
+            source: Box::new(resolved.runtime_source()),
+            index: Box::new(lower_expr(index, location, context, errors)),
+            element_model: resolved.element_model,
+        };
+    }
+'''
+          if text.count(old) != 1:
+              raise SystemExit('expected indexed designation helper use exactly once')
+          text = text.replace(old, new, 1)
+
+          old = '''    if let Some((source, element_model)) = designation_sequence_member_source(source, context) {
+        let Some(template) = context.runtime_model_templates.get(&element_model) else {
+'''
+          new = '''    if let Some(resolved) = resolve_designation_sequence_member(source, context) {
+        let element_model = resolved.element_model.clone();
+        let Some(template) = context.runtime_model_templates.get(&element_model) else {
+'''
+          if text.count(old) != 1:
+              raise SystemExit('expected indexed member helper use exactly once')
+          text = text.replace(old, new, 1)
+
+          old = '''        return Expr::RuntimeIndexMember {
+            source: Box::new(source),
+'''
+          new = '''        return Expr::RuntimeIndexMember {
+            source: Box::new(resolved.runtime_source()),
+'''
+          # This exact snippet should occur once in the dynamic designation branch.
+          if text.count(old) != 1:
+              raise SystemExit(f'expected one dynamic RuntimeIndexMember source use, found {text.count(old)}')
+          text = text.replace(old, new, 1)
+
+          if 'designation_sequence_member_source' in text:
+              raise SystemExit('old helper name remains')
+
+          path.write_text(text)
+      - name: Format and commit
+        run: |
+          cd compiler
+          cargo fmt
+          cd ..
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add compiler/src/sequence_lowering.rs
+          git commit -m "Separate designation sequence resolution from expression materialization"
+          git push origin HEAD:refactor-designation-sequence-resolution
