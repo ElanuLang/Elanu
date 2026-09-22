@@ -41,6 +41,8 @@ mod structural_edit_surface;
 mod structural_move;
 mod structural_move_surface;
 pub mod token;
+#[cfg(test)]
+mod trash_restore_pressure_tests;
 
 use std::collections::HashMap;
 
