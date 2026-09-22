@@ -27,6 +27,8 @@ mod designation_metadata_execution;
 #[cfg(test)]
 mod lifetime_termination_execution;
 #[cfg(test)]
+mod model_local_designation_experiment;
+#[cfg(test)]
 mod provenance_transfer_execution;
 #[cfg(test)]
 mod structural_move_execution;
