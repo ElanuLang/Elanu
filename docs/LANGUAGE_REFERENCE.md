@@ -1249,7 +1249,7 @@ API. Its subtree is the current lifetime-provenance subtree, not a collection-me
 
 ---
 
-# 21. Owner-relative child lifetime `transfer` — provisional/implemented
+# 20. Owner-relative child lifetime `transfer` — provisional/implemented
 
 Elanu accepts one narrow operation that changes the lifetime/root provenance of an existing
 committed dynamic child without changing that child's identity:
@@ -1308,7 +1308,7 @@ overlays are not language law.
 
 ---
 
-# 20. Read-only `reduce` — v0.8.0 provisional/implemented
+# 21. Read-only `reduce` — v0.8.0 provisional/implemented
 
 The current reduction surface is:
 
