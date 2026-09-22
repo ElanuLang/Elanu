@@ -6,13 +6,13 @@ use crate::ast::{
 };
 use crate::diagnostic::Diagnostic;
 use crate::filter_integration::MODEL_FILTER_BINDING_PREFIX;
+use crate::model_sequence_integration::ExternalizedModelSequence;
 use crate::reduction_surface::{decode_reduction, parse_expression_fragment, ReductionSpec};
 use crate::runtime_sequence_markers::{
     decode_runtime_sequence_type, encode_runtime_sequence_type, encode_runtime_sequence_value,
 };
 use crate::semantic::{show_type, RuntimeReductionPayload, ValueType};
 
-const MODEL_SEQUENCE_BINDING_PREFIX: &str = "__meld_mseq$";
 const MODEL_BINDING_PREFIX: &str = "__meld_sm$";
 const LOWERED_SEQUENCE_VALUE_PREFIX: &str = "__meld_sequence_value$";
 
@@ -30,9 +30,10 @@ pub struct RealizedProgram {
 pub fn lower(
     program: &Program,
     runtime_reduction_types: &HashMap<String, ValueType>,
+    externalized_sequences: &HashMap<String, ExternalizedModelSequence>,
 ) -> Result<RealizedProgram, Vec<Diagnostic>> {
     let mut errors = Vec::new();
-    let sequence_infos = collect_runtime_sequences(program, &mut errors);
+    let sequence_infos = collect_runtime_sequences(program, externalized_sequences, &mut errors);
     if !errors.is_empty() {
         return Err(errors);
     }
@@ -46,6 +47,7 @@ pub fn lower(
                 declaration,
                 &sequence_infos,
                 runtime_reduction_types,
+                externalized_sequences,
                 &mut runtime_reductions,
                 &mut errors,
             )
@@ -67,6 +69,7 @@ pub fn lower(
 
 fn collect_runtime_sequences(
     program: &Program,
+    externalized_sequences: &HashMap<String, ExternalizedModelSequence>,
     errors: &mut Vec<Diagnostic>,
 ) -> HashMap<String, RuntimeSequenceInfo> {
     let mut result: HashMap<String, RuntimeSequenceInfo> = HashMap::new();
@@ -131,7 +134,7 @@ fn collect_runtime_sequences(
                         ));
                         continue;
                     };
-                    if !source.starts_with(MODEL_SEQUENCE_BINDING_PREFIX) {
+                    if !externalized_sequences.contains_key(source) {
                         continue;
                     }
                     let Some(model_name) = element_model.as_deref() else {
@@ -153,7 +156,7 @@ fn collect_runtime_sequences(
                     let Some(reduction) = decode_reduction(value) else {
                         continue;
                     };
-                    if !reduction.source.starts_with(MODEL_SEQUENCE_BINDING_PREFIX) {
+                    if !externalized_sequences.contains_key(&reduction.source) {
                         continue;
                     }
                     let Some(model_name) = reduction.element_model.as_deref() else {
@@ -387,6 +390,7 @@ fn lower_declaration(
     declaration: &Declaration,
     sequences: &HashMap<String, RuntimeSequenceInfo>,
     runtime_reduction_types: &HashMap<String, ValueType>,
+    externalized_sequences: &HashMap<String, ExternalizedModelSequence>,
     runtime_reductions: &mut HashMap<String, RuntimeReductionPayload>,
     errors: &mut Vec<Diagnostic>,
 ) -> Declaration {
@@ -409,11 +413,12 @@ fn lower_declaration(
         Declaration::Derived(derived) => {
             let expression = if let Expr::String(value) = &derived.expression {
                 if let Some(reduction) = decode_reduction(value) {
-                    if is_runtime_reduction_source(&reduction.source) {
+                    if is_runtime_reduction_source(&reduction.source, externalized_sequences) {
                         lower_runtime_reduction(
                             derived,
                             reduction,
                             runtime_reduction_types,
+                            externalized_sequences,
                             runtime_reductions,
                             errors,
                         )
@@ -445,15 +450,18 @@ fn lower_declaration(
     }
 }
 
-fn is_runtime_reduction_source(source: &str) -> bool {
-    source.starts_with(MODEL_SEQUENCE_BINDING_PREFIX)
-        || source.starts_with(MODEL_FILTER_BINDING_PREFIX)
+fn is_runtime_reduction_source(
+    source: &str,
+    externalized_sequences: &HashMap<String, ExternalizedModelSequence>,
+) -> bool {
+    externalized_sequences.contains_key(source) || source.starts_with(MODEL_FILTER_BINDING_PREFIX)
 }
 
 fn lower_runtime_reduction(
     derived: &DerivedDecl,
     reduction: ReductionSpec,
     runtime_reduction_types: &HashMap<String, ValueType>,
+    externalized_sequences: &HashMap<String, ExternalizedModelSequence>,
     runtime_reductions: &mut HashMap<String, RuntimeReductionPayload>,
     errors: &mut Vec<Diagnostic>,
 ) -> Expr {
@@ -482,8 +490,14 @@ fn lower_runtime_reduction(
         return Expr::Integer(0);
     }
 
+    let owner_root = runtime_reduction_owner_root(&reduction.source, externalized_sequences);
     let initial = match parse_expression_fragment(&reduction.initial_source) {
-        Ok(initial) => rewrite_runtime_reduction_owner_names(&initial, &reduction, false),
+        Ok(initial) => rewrite_runtime_reduction_owner_names(
+            &initial,
+            &reduction,
+            false,
+            owner_root.as_deref(),
+        ),
         Err(parse_errors) => {
             errors.push(diag(
                 derived.location,
@@ -497,7 +511,9 @@ fn lower_runtime_reduction(
         }
     };
     let step = match parse_expression_fragment(&reduction.step_source) {
-        Ok(step) => rewrite_runtime_reduction_owner_names(&step, &reduction, true),
+        Ok(step) => {
+            rewrite_runtime_reduction_owner_names(&step, &reduction, true, owner_root.as_deref())
+        }
         Err(parse_errors) => {
             errors.push(diag(
                 derived.location,
@@ -783,8 +799,8 @@ fn rewrite_runtime_reduction_owner_names(
     expression: &Expr,
     reduction: &ReductionSpec,
     bindings_in_scope: bool,
+    owner_root: Option<&str>,
 ) -> Expr {
-    let owner_root = owner_root(&reduction.source);
     match expression {
         Expr::Integer(value) => Expr::Integer(*value),
         Expr::Float(value) => Expr::Float(*value),
@@ -815,11 +831,13 @@ fn rewrite_runtime_reduction_owner_names(
                 left,
                 reduction,
                 bindings_in_scope,
+                owner_root,
             )),
             right: Box::new(rewrite_runtime_reduction_owner_names(
                 right,
                 reduction,
                 bindings_in_scope,
+                owner_root,
             )),
         },
         Expr::If {
@@ -831,16 +849,19 @@ fn rewrite_runtime_reduction_owner_names(
                 condition,
                 reduction,
                 bindings_in_scope,
+                owner_root,
             )),
             then_branch: Box::new(rewrite_runtime_reduction_owner_names(
                 then_branch,
                 reduction,
                 bindings_in_scope,
+                owner_root,
             )),
             else_branch: Box::new(rewrite_runtime_reduction_owner_names(
                 else_branch,
                 reduction,
                 bindings_in_scope,
+                owner_root,
             )),
         },
         Expr::Filter { .. } => unreachable!("filters are not reduction expression fragments"),
@@ -857,10 +878,18 @@ fn rewrite_runtime_reduction_owner_names(
     }
 }
 
-fn owner_root(source: &str) -> Option<&str> {
-    let rest = source
-        .strip_prefix(MODEL_SEQUENCE_BINDING_PREFIX)
-        .or_else(|| source.strip_prefix(MODEL_FILTER_BINDING_PREFIX))?;
+fn runtime_reduction_owner_root(
+    source: &str,
+    externalized_sequences: &HashMap<String, ExternalizedModelSequence>,
+) -> Option<String> {
+    externalized_sequences
+        .get(source)
+        .map(|sequence| sequence.owner_root.clone())
+        .or_else(|| filter_owner_root(source).map(str::to_string))
+}
+
+fn filter_owner_root(source: &str) -> Option<&str> {
+    let rest = source.strip_prefix(MODEL_FILTER_BINDING_PREFIX)?;
     let (root, member) = rest.split_once('$')?;
     if root.is_empty() || member.is_empty() || member.contains('$') {
         return None;
@@ -889,4 +918,32 @@ fn first_diagnostic_message(errors: &[Diagnostic]) -> String {
 
 fn diag(location: SourceLocation, message: impl Into<String>) -> Diagnostic {
     Diagnostic::new(message, location.line, location.column)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn externalized_sequence_role_uses_provenance_not_generated_name() {
+        let externalized_sequences = HashMap::from([(
+            "opaque-sequence-binding".to_string(),
+            ExternalizedModelSequence {
+                owner_root: "project".to_string(),
+                owner_model: "Project".to_string(),
+                member_name: "tasks".to_string(),
+                element_model: "Task".to_string(),
+            },
+        )]);
+
+        assert!(is_runtime_reduction_source(
+            "opaque-sequence-binding",
+            &externalized_sequences,
+        ));
+        assert_eq!(
+            runtime_reduction_owner_root("opaque-sequence-binding", &externalized_sequences)
+                .as_deref(),
+            Some("project")
+        );
+    }
 }
