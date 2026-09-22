@@ -8,6 +8,7 @@ use crate::diagnostic::Diagnostic;
 use crate::runtime_model_templates::RuntimeModelRoot;
 
 pub const DESTROY_BUILTIN_ACTION: &str = "__meld_surface_destroy_child_builtin";
+pub const PURGE_BUILTIN_ACTION: &str = "__meld_surface_purge_subtree_builtin";
 
 /// Preprocess the intentionally narrow rooted-child lifetime surface:
 ///
@@ -18,17 +19,23 @@ pub const DESTROY_BUILTIN_ACTION: &str = "__meld_surface_destroy_child_builtin";
 /// owner is encoded as a String because the operation names/proves root
 /// provenance rather than reading an ordinary owner value.
 pub fn preprocess(source: &str) -> Result<String, Vec<Diagnostic>> {
-    if source.contains(DESTROY_BUILTIN_ACTION) {
-        return Err(vec![Diagnostic::new(
-            "reserved compiler child-destroy marker cannot appear in source",
-            1,
-            1,
-        )]);
+    for (reserved, label) in [
+        (DESTROY_BUILTIN_ACTION, "child-destroy"),
+        (PURGE_BUILTIN_ACTION, "subtree-purge"),
+    ] {
+        if source.contains(reserved) {
+            return Err(vec![Diagnostic::new(
+                format!("reserved compiler {label} marker cannot appear in source"),
+                1,
+                1,
+            )]);
+        }
     }
 
     let mut output = String::with_capacity(source.len());
     let mut index = 0;
     let mut saw_destroy = false;
+    let mut saw_purge = false;
 
     while index < source.len() {
         if source.as_bytes()[index] == b'"' {
@@ -62,6 +69,20 @@ pub fn preprocess(source: &str) -> Result<String, Vec<Diagnostic>> {
             }
         }
 
+        if keyword_at(source, index, "purge") {
+            if let Some((end, designation, owner)) = parse_purge_statement(source, index) {
+                output.push_str(PURGE_BUILTIN_ACTION);
+                output.push('(');
+                output.push_str(&designation);
+                output.push_str(", ");
+                output.push_str(&owner);
+                output.push(')');
+                index = end;
+                saw_purge = true;
+                continue;
+            }
+        }
+
         let ch = source[index..]
             .chars()
             .next()
@@ -73,6 +94,11 @@ pub fn preprocess(source: &str) -> Result<String, Vec<Diagnostic>> {
     if saw_destroy {
         output.push_str("\naction ");
         output.push_str(DESTROY_BUILTIN_ACTION);
+        output.push_str("(target: String, ownerName: String) {}\n");
+    }
+    if saw_purge {
+        output.push_str("\naction ");
+        output.push_str(PURGE_BUILTIN_ACTION);
         output.push_str("(target: String, ownerName: String) {}\n");
     }
 
@@ -125,7 +151,7 @@ pub fn lower_owners(program: &Program, roots: &HashMap<String, RuntimeModelRoot>
                     location,
                     name,
                     arguments,
-                } if name == DESTROY_BUILTIN_ACTION => {
+                } if name == DESTROY_BUILTIN_ACTION || name == PURGE_BUILTIN_ACTION => {
                     let mut arguments = arguments.clone();
                     if let Some(ActionArgument::Value(Expr::Name(owner))) = arguments.get(1) {
                         if roots.contains_key(owner) {
@@ -186,12 +212,17 @@ fn validate_statements(
                 location,
                 name,
                 arguments,
-            } if name == DESTROY_BUILTIN_ACTION => {
+            } if name == DESTROY_BUILTIN_ACTION || name == PURGE_BUILTIN_ACTION => {
+                let operation = if name == DESTROY_BUILTIN_ACTION {
+                    "destroy"
+                } else {
+                    "purge"
+                };
                 let [ActionArgument::Value(Expr::Name(designation)), ActionArgument::Value(Expr::Name(owner))] =
                     arguments.as_slice()
                 else {
                     errors.push(Diagnostic::new(
-                        "internal child-destroy marker is malformed",
+                        format!("internal child-{operation} marker is malformed"),
                         location.line,
                         location.column,
                     ));
@@ -202,14 +233,14 @@ fn validate_statements(
                     Some((_, true)) => {}
                     Some((model, false)) => errors.push(Diagnostic::new(
                         format!(
-                            "destroy requires persistent maybe live {model}; '{designation}' is plain live {model} and cannot become absent"
+                            "{operation} requires persistent maybe live {model}; '{designation}' is plain live {model} and cannot become absent"
                         ),
                         location.line,
                         location.column,
                     )),
                     None => errors.push(Diagnostic::new(
                         format!(
-                            "destroy requires a persistent maybe live designation state; '{designation}' is not one"
+                            "{operation} requires a persistent maybe live designation state; '{designation}' is not one"
                         ),
                         location.line,
                         location.column,
@@ -219,7 +250,7 @@ fn validate_statements(
                 if !roots.contains_key(owner) && !designation_kinds.contains_key(owner) {
                     errors.push(Diagnostic::new(
                         format!(
-                            "destroy owner '{owner}' is not a modeled-state root or persistent live designation"
+                            "{operation} owner '{owner}' is not a modeled-state root or persistent live designation"
                         ),
                         location.line,
                         location.column,
@@ -238,6 +269,28 @@ fn validate_statements(
             }
             _ => {}
         }
+    }
+}
+
+fn parse_purge_statement(source: &str, start: usize) -> Option<(usize, String, String)> {
+    let mut index = start + "purge".len();
+    index = skip_inline_whitespace(source, index);
+
+    let (designation, next) = parse_identifier(source, index)?;
+    index = skip_inline_whitespace(source, next);
+    if !keyword_at(source, index, "in") {
+        return None;
+    }
+    index += "in".len();
+    index = skip_inline_whitespace(source, index);
+
+    let (owner, next) = parse_name_path(source, index)?;
+    index = skip_inline_whitespace(source, next);
+
+    match source.as_bytes().get(index).copied() {
+        None | Some(b'\n' | b'\r' | b';' | b'}') => Some((index, designation, owner)),
+        Some(b'/') if source[index..].starts_with("//") => Some((index, designation, owner)),
+        _ => None,
     }
 }
 
