@@ -6,6 +6,7 @@ mod existing_designation_insert_surface;
 mod filter_integration;
 pub mod lexer;
 mod lifetime_termination_surface;
+mod lifetime_transfer_surface;
 pub mod live_designation_lowering;
 pub mod model_lowering;
 pub mod model_sequence_integration;
@@ -54,7 +55,8 @@ pub struct CheckedSource {
 }
 
 pub fn parse_source(source: &str) -> Result<Program, Vec<Diagnostic>> {
-    let source = lifetime_termination_surface::preprocess(source)?;
+    let source = lifetime_transfer_surface::preprocess(source)?;
+    let source = lifetime_termination_surface::preprocess(&source)?;
     let source = structural_edit_surface::preprocess(&source)?;
     let source = structural_move_surface::preprocess(&source)?;
     let source = scoped_create_surface::preprocess(&source)?;
@@ -75,11 +77,16 @@ pub fn check_source_with_runtime_models(source: &str) -> Result<CheckedSource, V
     let runtime_model_templates = runtime_model_templates::collect(&program.state_models)?;
     let runtime_model_roots =
         runtime_model_templates::collect_roots(&program, &runtime_model_templates);
+    lifetime_transfer_surface::validate(&program, &runtime_model_roots)?;
     lifetime_termination_surface::validate(&program, &runtime_model_roots)?;
     create_surface::validate(&program, &runtime_model_templates, &runtime_model_roots)?;
     scoped_create_surface::validate(&program, &runtime_model_templates, &runtime_model_roots)?;
-    let lifetime_owner_prepared =
-        lifetime_termination_surface::lower_owners(&program, &runtime_model_roots);
+    let lifetime_transfer_prepared =
+        lifetime_transfer_surface::lower_owners(&program, &runtime_model_roots);
+    let lifetime_owner_prepared = lifetime_termination_surface::lower_owners(
+        &lifetime_transfer_prepared,
+        &runtime_model_roots,
+    );
     let scoped_create_surface::ScopedCreateLowering {
         program: create_prepared,
         designation_models: create_scope_designations,

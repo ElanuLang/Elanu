@@ -562,7 +562,6 @@ impl Runtime {
         })
     }
 
-    #[cfg(test)]
     fn transfer_runtime_model_owner(
         &mut self,
         identity: &str,
@@ -777,6 +776,64 @@ impl Runtime {
         Ok(())
     }
 
+    fn invoke_transfer_builtin(
+        &mut self,
+        arguments: &[ActionArgument],
+    ) -> Result<(), RuntimeError> {
+        let [ActionArgument::Value(target), ActionArgument::Value(source_owner), ActionArgument::Value(destination_owner)] =
+            arguments
+        else {
+            return Err(RuntimeError::new(
+                "internal child-transfer builtin expects target, source owner, and destination owner",
+            ));
+        };
+
+        let target = match self.eval_expr(target, None)? {
+            Value::String(target) if target.is_empty() => {
+                return Err(RuntimeError::new(
+                    "transfer requires a present live designation",
+                ));
+            }
+            Value::String(target) => target,
+            other => {
+                return Err(RuntimeError::new(format!(
+                    "internal child-transfer target must be String, got {}",
+                    other.type_name()
+                )));
+            }
+        };
+        let source_owner = match self.eval_expr(source_owner, None)? {
+            Value::String(owner) if owner.is_empty() => {
+                return Err(RuntimeError::new(
+                    "transfer requires a present source owner designation",
+                ));
+            }
+            Value::String(owner) => owner,
+            other => {
+                return Err(RuntimeError::new(format!(
+                    "internal child-transfer source owner must be String, got {}",
+                    other.type_name()
+                )));
+            }
+        };
+        let destination_owner = match self.eval_expr(destination_owner, None)? {
+            Value::String(owner) if owner.is_empty() => {
+                return Err(RuntimeError::new(
+                    "transfer requires a present destination owner designation",
+                ));
+            }
+            Value::String(owner) => owner,
+            other => {
+                return Err(RuntimeError::new(format!(
+                    "internal child-transfer destination owner must be String, got {}",
+                    other.type_name()
+                )));
+            }
+        };
+
+        self.transfer_runtime_model_owner(&target, &source_owner, &destination_owner)
+    }
+
     fn invoke_destroy_builtin(&mut self, arguments: &[ActionArgument]) -> Result<(), RuntimeError> {
         let [ActionArgument::Value(target), ActionArgument::Value(owner)] = arguments else {
             return Err(RuntimeError::new(
@@ -822,6 +879,9 @@ impl Runtime {
         name: &str,
         arguments: &[ActionArgument],
     ) -> Result<(), RuntimeError> {
+        if name == crate::lifetime_transfer_surface::TRANSFER_BUILTIN_ACTION {
+            return self.invoke_transfer_builtin(arguments);
+        }
         if name == crate::lifetime_termination_surface::DESTROY_BUILTIN_ACTION {
             return self.invoke_destroy_builtin(arguments);
         }
