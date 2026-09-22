@@ -11,6 +11,20 @@ use crate::sequence_surface::{decode_sequence_literal, decode_sequence_live_type
 
 pub(crate) const MODEL_SEQUENCE_BINDING_PREFIX: &str = "__meld_mseq$";
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ExternalizedModelSequence {
+    pub(crate) owner_root: String,
+    pub(crate) owner_model: String,
+    pub(crate) member_name: String,
+    pub(crate) element_model: String,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ModelSequenceLowering {
+    pub(crate) program: Program,
+    pub(crate) externalized_sequences: HashMap<String, ExternalizedModelSequence>,
+}
+
 #[derive(Debug, Clone)]
 struct SequenceMemberSpec {
     member_name: String,
@@ -32,14 +46,17 @@ struct SequenceMemberSpec {
 /// of an owner model remains valid and may resolve that exact owner's members at
 /// runtime. Whole modeled-state value/authority projection is still deferred where
 /// the older lowering cannot include the externalized sequence member coherently.
-pub fn lower(program: &Program) -> Result<Program, Vec<Diagnostic>> {
+pub fn lower(program: &Program) -> Result<ModelSequenceLowering, Vec<Diagnostic>> {
     let facts = ProgramFacts::from_program(program);
     let mut errors = Vec::new();
     let specs = collect_sequence_members(program, &facts, &mut errors);
 
     if specs.is_empty() {
         return if errors.is_empty() {
-            Ok(program.clone())
+            Ok(ModelSequenceLowering {
+                program: program.clone(),
+                externalized_sequences: HashMap::new(),
+            })
         } else {
             Err(errors)
         };
@@ -54,6 +71,32 @@ pub fn lower(program: &Program) -> Result<Program, Vec<Diagnostic>> {
     }
 
     let root_members = collect_root_members(&facts, &specs);
+    let externalized_sequences: HashMap<String, ExternalizedModelSequence> = root_members
+        .iter()
+        .flat_map(|(root, members)| {
+            let owner_model = facts
+                .modeled_state_roots()
+                .iter()
+                .find(|candidate| candidate.name == *root)
+                .map(|candidate| candidate.model_name.clone())
+                .expect("externalized model-sequence root must retain modeled-root facts");
+            members.iter().map(move |member| {
+                let binding_name = model_sequence_binding_name(root, &member.member_name);
+                let element_model = decode_sequence_live_type(&member.encoded_type_name)
+                    .expect("externalized model-sequence type must remain [live T]")
+                    .to_string();
+                (
+                    binding_name,
+                    ExternalizedModelSequence {
+                        owner_root: root.clone(),
+                        owner_model: owner_model.clone(),
+                        member_name: member.member_name.clone(),
+                        element_model,
+                    },
+                )
+            })
+        })
+        .collect();
     let path_rewrites: HashMap<String, String> = root_members
         .iter()
         .flat_map(|(root, members)| {
@@ -93,9 +136,12 @@ pub fn lower(program: &Program) -> Result<Program, Vec<Diagnostic>> {
         }
     }
 
-    Ok(Program {
-        declarations,
-        state_models,
+    Ok(ModelSequenceLowering {
+        program: Program {
+            declarations,
+            state_models,
+        },
+        externalized_sequences,
     })
 }
 
