@@ -19,6 +19,7 @@ jobs:
         run: |
           python .github/scripts/fix_explicit_purge_promotion_script.py
           python .github/scripts/promote_explicit_subtree_purge.py
+          python .github/scripts/fix_purge_static_owner_lowering.py
       - name: Format and run focused lifetime tests
         run: |
           cd compiler
