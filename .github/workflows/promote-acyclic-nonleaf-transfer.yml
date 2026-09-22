@@ -1,0 +1,32 @@
+name: Promote acyclic non-leaf transfer
+
+on:
+  push:
+    branches:
+      - promote-acyclic-nonleaf-transfer
+
+permissions:
+  contents: write
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: promote-acyclic-nonleaf-transfer
+      - name: Apply bounded transfer promotion
+        run: python .github/scripts/promote_acyclic_nonleaf_transfer.py
+      - name: Format and run focused transfer tests
+        run: |
+          cd compiler
+          cargo fmt
+          cargo test runtime::provenance_transfer_execution -- --nocapture
+          cd ..
+      - name: Commit production promotion
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add compiler/src/runtime.rs compiler/src/runtime/provenance_transfer_execution.rs docs/LANGUAGE_REFERENCE.md docs/DESIGN_DECISIONS.md CHANGELOG.md
+          git commit -m "Promote acyclic non-leaf provenance transfer"
+          git push origin HEAD:promote-acyclic-nonleaf-transfer
