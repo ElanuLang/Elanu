@@ -113,6 +113,7 @@ impl std::error::Error for RuntimeError {}
 struct StateCell {
     value: Value,
     value_type: ValueType,
+    designation: Option<RuntimeDesignationMetadata>,
     dependents: HashSet<String>,
 }
 
@@ -270,6 +271,7 @@ impl Runtime {
                         StateCell {
                             value,
                             value_type,
+                            designation: None,
                             dependents: HashSet::new(),
                         },
                     );
@@ -340,6 +342,14 @@ impl Runtime {
         runtime.runtime_model_templates = source.runtime_model_templates.clone();
         runtime.runtime_model_roots = source.runtime_model_roots.clone();
         runtime.runtime_designations = source.runtime_designations.clone();
+        for (name, metadata) in &source.runtime_designations {
+            let state = runtime.states.get_mut(name).ok_or_else(|| {
+                RuntimeError::new(format!(
+                    "persistent designation metadata names missing state '{name}'"
+                ))
+            })?;
+            state.designation = Some(metadata.clone());
+        }
         Ok(runtime)
     }
 
@@ -499,6 +509,7 @@ impl Runtime {
             let cell = StateCell {
                 value,
                 value_type: member.value_type.clone(),
+                designation: None,
                 dependents: HashSet::new(),
             };
             self.transaction
@@ -773,11 +784,35 @@ impl Runtime {
             ));
         }
 
-        let designation_metadata = self
-            .runtime_designations
+        let designation_deleted_states = self
+            .transaction
+            .as_ref()
+            .expect("transaction should exist")
+            .deleted_states
+            .clone();
+        let mut designation_metadata = self
+            .states
             .iter()
-            .map(|(name, metadata)| (name.clone(), metadata.allows_none))
+            .filter(|(name, _)| !designation_deleted_states.contains(*name))
+            .filter_map(|(name, cell)| {
+                cell.designation
+                    .as_ref()
+                    .map(|metadata| (name.clone(), metadata.allows_none))
+            })
             .collect::<Vec<_>>();
+        designation_metadata.extend(
+            self.transaction
+                .as_ref()
+                .expect("transaction should exist")
+                .created_states
+                .iter()
+                .filter(|(name, _)| !designation_deleted_states.contains(*name))
+                .filter_map(|(name, cell)| {
+                    cell.designation
+                        .as_ref()
+                        .map(|metadata| (name.clone(), metadata.allows_none))
+                }),
+        );
         let mut optional_designations = Vec::new();
         for (name, allows_none) in designation_metadata {
             let value = self.read_global_state(&name, None)?;

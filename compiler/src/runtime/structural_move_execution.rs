@@ -25,6 +25,7 @@ fn state(value: Value, value_type: ValueType) -> StateCell {
     StateCell {
         value,
         value_type,
+        designation: None,
         dependents: HashSet::new(),
     }
 }

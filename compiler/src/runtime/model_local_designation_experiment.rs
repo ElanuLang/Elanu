@@ -71,14 +71,14 @@ fn register_model_local_maybe_designation(
     target_model: &str,
 ) -> String {
     let state_name = model_binding_name(owner_identity, member);
-    assert!(runtime.states.contains_key(&state_name));
-    runtime.runtime_designations.insert(
-        state_name.clone(),
-        RuntimeDesignationMetadata {
-            model_name: target_model.to_string(),
-            allows_none: true,
-        },
-    );
+    let state = runtime
+        .states
+        .get_mut(&state_name)
+        .expect("model-local designation carrier state should exist");
+    state.designation = Some(RuntimeDesignationMetadata {
+        model_name: target_model.to_string(),
+        allows_none: true,
+    });
     state_name
 }
 
@@ -208,4 +208,41 @@ fn aborted_target_termination_restores_model_local_optional_designation_slots() 
         Value::String(target.clone())
     );
     assert_eq!(runtime.value(&slot_b).unwrap(), Value::String(target));
+}
+
+#[test]
+fn designation_role_disappears_with_the_model_member_state_that_owns_it() {
+    let mut runtime = runtime(SOURCE);
+    runtime.run_action("seed").expect("seed should commit");
+
+    let identities = targets(&mut runtime, "__meld_mseq$workspace$children");
+    let holder = identities[0].clone();
+    let target = identities[2].clone();
+
+    let slot = register_model_local_maybe_designation(
+        &mut runtime,
+        &holder,
+        "designationCarrier",
+        "Folder",
+    );
+    run_test_transaction(&mut runtime, |runtime| {
+        runtime.write_state(&slot, Value::String(target.clone()))
+    })
+    .expect("model-local designation selection should commit");
+
+    run_test_transaction(&mut runtime, |runtime| {
+        runtime.terminate_runtime_model(&holder, "workspace")
+    })
+    .expect("designation-slot owner should terminate independently of its target");
+
+    assert!(!runtime.model_identity_exists(&holder));
+    assert!(!runtime.state_exists(&slot));
+    assert!(runtime.model_identity_exists(&target));
+
+    run_test_transaction(&mut runtime, |runtime| {
+        runtime.terminate_runtime_model(&target, "workspace")
+    })
+    .expect("later target termination must not encounter stale designation metadata");
+
+    assert!(!runtime.model_identity_exists(&target));
 }
