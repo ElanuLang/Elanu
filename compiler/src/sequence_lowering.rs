@@ -806,10 +806,30 @@ fn lower_indexed_member_read(
     build_expr_choice(info, branches, expressions)
 }
 
-fn designation_sequence_member_source(
+#[derive(Debug, Clone)]
+struct DesignationSequenceMember {
+    designation: String,
+    member: String,
+    owner_model: String,
+    element_model: String,
+    member_type_name: String,
+}
+
+impl DesignationSequenceMember {
+    fn runtime_source(&self) -> Expr {
+        Expr::RuntimeDesignationMember {
+            designation: Box::new(Expr::Name(self.designation.clone())),
+            member: self.member.clone(),
+            element_model: self.owner_model.clone(),
+            member_type_name: self.member_type_name.clone(),
+        }
+    }
+}
+
+fn resolve_designation_sequence_member(
     source: &str,
     context: &LoweringContext<'_>,
-) -> Option<(Expr, String)> {
+) -> Option<DesignationSequenceMember> {
     let (designation, member) = source.split_once('.')?;
     if designation.is_empty() || member.is_empty() || member.contains('.') {
         return None;
@@ -825,22 +845,20 @@ fn designation_sequence_member_source(
         return None;
     };
 
-    Some((
-        Expr::RuntimeDesignationMember {
-            designation: Box::new(Expr::Name(designation.to_string())),
-            member: member.to_string(),
-            element_model: owner_model.clone(),
-            member_type_name: runtime_value_type_name(&member_template.value_type),
-        },
-        element_model.clone(),
-    ))
+    Some(DesignationSequenceMember {
+        designation: designation.to_string(),
+        member: member.to_string(),
+        owner_model: owner_model.clone(),
+        element_model: element_model.clone(),
+        member_type_name: runtime_value_type_name(&member_template.value_type),
+    })
 }
 
 fn designation_sequence_member_model(
     source: &str,
     context: &LoweringContext<'_>,
 ) -> Option<String> {
-    designation_sequence_member_source(source, context).map(|(_, model)| model)
+    resolve_designation_sequence_member(source, context).map(|resolved| resolved.element_model)
 }
 
 fn lower_runtime_indexed_designation(
@@ -857,11 +875,11 @@ fn lower_runtime_indexed_designation(
             element_model: element_model.clone(),
         };
     }
-    if let Some((source, element_model)) = designation_sequence_member_source(source, context) {
+    if let Some(resolved) = resolve_designation_sequence_member(source, context) {
         return Expr::RuntimeIndexDesignation {
-            source: Box::new(source),
+            source: Box::new(resolved.runtime_source()),
             index: Box::new(lower_expr(index, location, context, errors)),
-            element_model,
+            element_model: resolved.element_model,
         };
     }
     let Some(info) = context.sequences.get(source) else {
@@ -917,7 +935,8 @@ fn lower_runtime_indexed_member_read(
         };
     }
 
-    if let Some((source, element_model)) = designation_sequence_member_source(source, context) {
+    if let Some(resolved) = resolve_designation_sequence_member(source, context) {
+        let element_model = resolved.element_model.clone();
         let Some(template) = context.runtime_model_templates.get(&element_model) else {
             errors.push(diag(
                 location,
@@ -933,7 +952,7 @@ fn lower_runtime_indexed_member_read(
             return Expr::Integer(0);
         };
         return Expr::RuntimeIndexMember {
-            source: Box::new(source),
+            source: Box::new(resolved.runtime_source()),
             index: Box::new(lower_expr(index, location, context, errors)),
             member: member.to_string(),
             element_model,
