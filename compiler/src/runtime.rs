@@ -644,6 +644,99 @@ impl Runtime {
         }
     }
 
+    #[cfg(test)]
+    fn committed_provenance_subtree_postorder_experiment(
+        &self,
+        root: &str,
+    ) -> Result<Vec<String>, RuntimeError> {
+        if !self.dynamic_model_owners.contains_key(root) {
+            return Err(RuntimeError::new(
+                "runtime subtree purge requires an existing committed dynamic root",
+            ));
+        }
+
+        if let Some(transaction) = self.transaction.as_ref() {
+            for fresh in transaction.created_model_owners.keys() {
+                if transaction.terminated_model_identities.contains(fresh) {
+                    continue;
+                }
+                let mut current = fresh.clone();
+                let mut visited = HashSet::new();
+                loop {
+                    if !visited.insert(current.clone()) {
+                        break;
+                    }
+                    let Some(owner) = self.current_dynamic_model_owner(&current) else {
+                        break;
+                    };
+                    if owner == root {
+                        return Err(RuntimeError::new(
+                            "runtime subtree purge does not yet cancel fresh transaction-local descendants",
+                        ));
+                    }
+                    current = owner;
+                }
+            }
+        }
+
+        fn visit(
+            runtime: &Runtime,
+            identity: &str,
+            visited: &mut HashSet<String>,
+            postorder: &mut Vec<String>,
+        ) {
+            if !visited.insert(identity.to_string()) {
+                return;
+            }
+            let children = runtime
+                .dynamic_model_owners
+                .keys()
+                .filter(|child| {
+                    runtime.current_dynamic_model_owner(child).as_deref() == Some(identity)
+                })
+                .cloned()
+                .collect::<Vec<_>>();
+            for child in children {
+                visit(runtime, &child, visited, postorder);
+            }
+            postorder.push(identity.to_string());
+        }
+
+        let mut visited = HashSet::new();
+        let mut postorder = Vec::new();
+        visit(self, root, &mut visited, &mut postorder);
+        Ok(postorder)
+    }
+
+    #[cfg(test)]
+    fn terminate_runtime_model_subtree_experiment(
+        &mut self,
+        identity: &str,
+        claimed_owner: &str,
+    ) -> Result<(), RuntimeError> {
+        let actual_owner = self.current_dynamic_model_owner(identity).ok_or_else(|| {
+            RuntimeError::new(
+                "runtime subtree purge requires an existing live committed dynamic root",
+            )
+        })?;
+        if actual_owner != claimed_owner {
+            return Err(RuntimeError::new(format!(
+                "runtime subtree purge requires rooting owner '{actual_owner}', not '{claimed_owner}'"
+            )));
+        }
+
+        let postorder = self.committed_provenance_subtree_postorder_experiment(identity)?;
+        for target in postorder {
+            let owner = self.current_dynamic_model_owner(&target).ok_or_else(|| {
+                RuntimeError::new(format!(
+                    "runtime subtree purge lost current owner for '{target}'"
+                ))
+            })?;
+            self.terminate_runtime_model(&target, &owner)?;
+        }
+        Ok(())
+    }
+
     fn terminate_runtime_model(
         &mut self,
         identity: &str,
