@@ -1,0 +1,21 @@
+state balance = 100
+state attempts = 2
+state locked = false
+
+derived empty = balance == 0
+derived lowBalance = balance < 50
+
+action withdraw {
+    if balance < 50 {
+        fail "Insufficient funds"
+    }
+
+    balance -= 50
+}
+
+action recordAttempt {
+    attempts += 1
+    if attempts >= 3 {
+        locked = true
+    }
+}

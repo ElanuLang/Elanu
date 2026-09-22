@@ -1,0 +1,82 @@
+// Smallest useful inventory/invoice workstation slice expressible in Elanu v0.6.1.
+//
+// One invoice line is intentionally modeled with scalar state. The purpose is
+// to pressure the existing kernel before introducing records, collections,
+// parameters, locals, or new effects.
+
+state sku = "SKU-001"
+state unitPrice: Float = 12.50
+state quantity = 2
+state inventory = 10
+state taxable = true
+state taxRate: Float = 0.08
+state checkedOut = false
+
+derived subtotal = unitPrice * quantity
+
+derived tax = if taxable {
+    subtotal * taxRate
+} else {
+    0.0
+}
+
+derived total = subtotal + tax
+
+derived projectedInventory = if checkedOut {
+    inventory
+} else {
+    inventory - quantity
+}
+
+action increaseQuantity {
+    if checkedOut {
+        fail "Invoice is already checked out"
+    }
+
+    quantity += 1
+}
+
+action decreaseQuantity {
+    if checkedOut {
+        fail "Invoice is already checked out"
+    }
+
+    if quantity <= 1 {
+        fail "Quantity must remain at least one"
+    }
+
+    quantity -= 1
+}
+
+action markTaxable {
+    if checkedOut {
+        fail "Invoice is already checked out"
+    }
+
+    taxable = true
+}
+
+action markTaxExempt {
+    if checkedOut {
+        fail "Invoice is already checked out"
+    }
+
+    taxable = false
+}
+
+action checkout {
+    if checkedOut {
+        fail "Invoice is already checked out"
+    }
+
+    if quantity <= 0 {
+        fail "Invoice quantity must be positive"
+    }
+
+    if quantity > inventory {
+        fail "Insufficient inventory"
+    }
+
+    inventory -= quantity
+    checkedOut = true
+}

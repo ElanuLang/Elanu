@@ -1,0 +1,12 @@
+state count = 5
+
+action inner {
+    count = 20
+    fail "inner failed"
+}
+
+action outer {
+    count = 10
+    inner()
+    count = 30
+}

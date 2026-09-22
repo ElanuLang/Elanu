@@ -1,0 +1,13 @@
+state loggedIn = false
+state name = "Matt"
+
+derived greeting =
+    if loggedIn {
+        "Hello, " + name
+    } else {
+        "Sign in"
+    }
+
+action login {
+    loggedIn = true
+}

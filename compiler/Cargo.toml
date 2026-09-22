@@ -1,0 +1,16 @@
+[package]
+name = "elanu-compiler"
+version = "0.9.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[[bin]]
+name = "elanu"
+path = "src/main.rs"
+
+[lib]
+name = "elanu_compiler"
+path = "src/lib.rs"
+
+[dependencies]
+caseless = "0.2.2"

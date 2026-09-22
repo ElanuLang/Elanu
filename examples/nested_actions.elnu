@@ -1,0 +1,14 @@
+state count = 0
+state observed = 0
+
+derived doubled = count * 2
+
+action inner {
+    count += 1
+}
+
+action outer {
+    inner()
+    observed = doubled
+    count += 10
+}

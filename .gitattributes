@@ -1,0 +1,22 @@
+# Elanu repository line-ending policy.
+#
+# Git's global core.autocrlf setting may vary by developer machine.
+# These attributes make repository text files deterministic.
+
+*.rs        text eol=lf
+*.py        text eol=lf
+*.toml      text eol=lf
+*.md        text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.json      text eol=lf
+*.sh        text eol=lf
+*.ps1       text eol=lf
+
+Cargo.lock  text eol=lf
+.gitignore  text eol=lf
+.gitattributes text eol=lf
+
+# Windows command scripts conventionally use CRLF.
+*.bat       text eol=crlf
+*.cmd       text eol=crlf

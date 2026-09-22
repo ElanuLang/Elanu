@@ -1,0 +1,12 @@
+state enabled = false
+state count = 0
+
+action enableAndRun {
+    enabled = true
+
+    if enabled {
+        count = 1
+    } else {
+        count = 2
+    }
+}

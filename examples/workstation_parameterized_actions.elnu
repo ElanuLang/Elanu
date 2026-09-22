@@ -1,0 +1,19 @@
+state quantityA = 1
+state quantityB = 10
+
+action increment(state target: Int) {
+    target += 1
+}
+
+action setQuantity(state target: Int, newValue: Int) {
+    if newValue <= 0 {
+        fail "Quantity must be positive"
+    }
+
+    target = newValue
+}
+
+action update {
+    increment(state quantityA)
+    setQuantity(state quantityB, quantityA + 5)
+}
