@@ -19,6 +19,7 @@ jobs:
         run: |
           python .github/scripts/enable_model_local_maybe_live_parser.py
           python .github/scripts/promote_model_local_maybe_live.py
+          python .github/scripts/fix_model_local_designation_binding_name.py
       - name: Format and run focused semantic tests
         run: |
           cd compiler
