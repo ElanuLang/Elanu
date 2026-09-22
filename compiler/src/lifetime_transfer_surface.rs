@@ -245,10 +245,7 @@ fn validate_statements(
     }
 }
 
-fn parse_transfer_statement(
-    source: &str,
-    start: usize,
-) -> Option<(usize, String, String, String)> {
+fn parse_transfer_statement(source: &str, start: usize) -> Option<(usize, String, String, String)> {
     let mut index = start + "transfer".len();
     index = skip_inline_whitespace(source, index);
 
@@ -373,9 +370,7 @@ mod tests {
     fn preprocesses_transfer_statement_and_injects_private_builtin() {
         let source = "action moveOwnership {\n    transfer selected from left to right\n}\n";
         let output = preprocess(source).unwrap();
-        assert!(output.contains(
-            "__meld_surface_transfer_child_builtin(selected, left, right)"
-        ));
+        assert!(output.contains("__meld_surface_transfer_child_builtin(selected, left, right)"));
         assert!(output.contains(
             "action __meld_surface_transfer_child_builtin(target: String, sourceOwner: String, destinationOwner: String) {}"
         ));
@@ -418,9 +413,9 @@ action invalid {
 }
 "#;
         let errors = crate::check_source(source).expect_err("invalid transfer should fail");
-        assert!(errors
-            .iter()
-            .any(|error| error.message.contains("requires persistent live or maybe live")));
+        assert!(errors.iter().any(|error| error
+            .message
+            .contains("requires persistent live or maybe live")));
         assert!(errors
             .iter()
             .any(|error| error.message.contains("transfer source owner 'ordinary'")));
@@ -457,7 +452,8 @@ action destroyFromRight {
 }
 "#;
         let checked = crate::check_source_with_runtime_models(source).expect("source should check");
-        let mut runtime = Runtime::from_checked_source(&checked).expect("runtime should initialize");
+        let mut runtime =
+            Runtime::from_checked_source(&checked).expect("runtime should initialize");
         runtime.run_action("seed").expect("seed should commit");
 
         let left_before = runtime.value("__meld_mseq$left$documents").unwrap();
@@ -520,7 +516,8 @@ action destroyFromLeft {
 }
 "#;
         let checked = crate::check_source_with_runtime_models(source).expect("source should check");
-        let mut runtime = Runtime::from_checked_source(&checked).expect("runtime should initialize");
+        let mut runtime =
+            Runtime::from_checked_source(&checked).expect("runtime should initialize");
 
         let absent = runtime
             .run_action("absentTransfer")
