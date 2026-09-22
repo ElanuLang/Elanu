@@ -604,9 +604,9 @@ impl Runtime {
                 "unknown modeled-state destination owner '{destination_owner}'"
             )));
         }
-        if self.has_live_dynamic_child_rooted_in(identity) {
+        if self.transfer_destination_would_create_provenance_cycle(identity, destination_owner) {
             return Err(RuntimeError::new(
-                "runtime modeled-state child roots another live child; subtree provenance transfer is not selected",
+                "runtime modeled-state provenance transfer would create an owner cycle",
             ));
         }
 
@@ -622,7 +622,6 @@ impl Runtime {
         Ok(())
     }
 
-    #[cfg(test)]
     fn transfer_destination_would_create_provenance_cycle(
         &self,
         identity: &str,
@@ -643,67 +642,6 @@ impl Runtime {
             };
             current = owner;
         }
-    }
-
-    #[cfg(test)]
-    fn transfer_runtime_model_owner_nonleaf_experiment(
-        &mut self,
-        identity: &str,
-        expected_owner: &str,
-        destination_owner: &str,
-    ) -> Result<(), RuntimeError> {
-        let Some(transaction) = self.transaction.as_ref() else {
-            return Err(RuntimeError::new(
-                "runtime model provenance can only transfer inside an active action transaction",
-            ));
-        };
-
-        if transaction.terminated_model_identities.contains(identity) {
-            return Err(RuntimeError::new(
-                "runtime modeled-state child is already terminated in this transaction",
-            ));
-        }
-        if !self.dynamic_model_owners.contains_key(identity) {
-            return Err(RuntimeError::new(
-                "runtime provenance transfer requires an existing committed dynamic child",
-            ));
-        }
-
-        let actual_owner = self
-            .current_dynamic_model_owner(identity)
-            .expect("committed live dynamic child should have an owner");
-        if actual_owner != expected_owner {
-            return Err(RuntimeError::new(format!(
-                "runtime modeled-state child is currently rooted in '{actual_owner}', not expected owner '{expected_owner}'"
-            )));
-        }
-
-        if identity == destination_owner {
-            return Err(RuntimeError::new(
-                "runtime modeled-state child cannot become its own rooting owner",
-            ));
-        }
-        if !self.model_identity_exists(destination_owner) {
-            return Err(RuntimeError::new(format!(
-                "unknown modeled-state destination owner '{destination_owner}'"
-            )));
-        }
-        if self.transfer_destination_would_create_provenance_cycle(identity, destination_owner) {
-            return Err(RuntimeError::new(
-                "runtime modeled-state provenance transfer would create an owner cycle",
-            ));
-        }
-
-        if actual_owner == destination_owner {
-            return Ok(());
-        }
-
-        self.transaction
-            .as_mut()
-            .expect("transaction should exist while transferring model provenance")
-            .updated_model_owners
-            .insert(identity.to_string(), destination_owner.to_string());
-        Ok(())
     }
 
     fn terminate_runtime_model(

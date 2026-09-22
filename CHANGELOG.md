@@ -4,6 +4,8 @@
 
 ### Language and semantics
 
+- Broadened existing lifetime `transfer` from leaf-only children to any committed dynamic identity when replacing its parent provenance edge preserves an acyclic transaction-visible provenance relation.
+- Non-leaf transfer preserves all descendant provenance edges; it is parent-edge replacement, not subtree migration, and `destroy` remains leaf-only.
 - Extended existing-designation structural insertion/removal to mutable membership owned by exact runtime-selected modeled identities carried through persistent live designations.
 - Dynamic-owner structural edits remain non-owning and compose transactionally with independent lifetime provenance transfer.
 - Added bounded lifetime provenance transfer with `transfer target from sourceOwner to destinationOwner` for existing committed dynamic leaf children.
@@ -32,6 +34,7 @@
 
 ### Compiler/runtime
 
+- Promoted the proven transaction-visible destination-owner-chain cycle check into production transfer and removed the duplicate test-only non-leaf transfer implementation.
 - Added transaction-visible dynamic-owner replacement so later lifetime checks in the same action observe staged provenance transfer and rollback discards it cleanly.
 - Reused persistent designation lowering and explicit owner identity transport rather than reconstructing provenance from generated names or structural membership.
 - Carries the ordering key and direction as structured `Expr::Filter` facts through compiler
