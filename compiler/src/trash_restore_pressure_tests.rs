@@ -87,7 +87,10 @@ fn current_structure_can_behaviorally_remember_and_restore_one_parent() {
 
     assert_eq!(runtime.value("inSource").unwrap(), Value::Bool(true));
     assert_eq!(runtime.value("inTrash").unwrap(), Value::Bool(false));
-    assert_eq!(runtime.value("remembersSource").unwrap(), Value::Bool(false));
+    assert_eq!(
+        runtime.value("remembersSource").unwrap(),
+        Value::Bool(false)
+    );
 
     runtime
         .run_action("proveRestoredOwner")
@@ -121,8 +124,9 @@ state model Folder {
 state workspace: Folder
 "#;
 
-    let errors = check_source_with_runtime_models(source)
-        .expect_err("model-local maybe-live designation should remain unsupported in this pressure test");
+    let errors = check_source_with_runtime_models(source).expect_err(
+        "model-local maybe-live designation should remain unsupported in this pressure test",
+    );
     assert!(errors.iter().any(|error| {
         error
             .message
