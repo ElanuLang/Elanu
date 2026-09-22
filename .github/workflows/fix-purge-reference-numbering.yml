@@ -1,0 +1,26 @@
+name: Fix purge reference numbering
+
+on:
+  push:
+    branches:
+      - promote-explicit-subtree-purge
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: promote-explicit-subtree-purge
+      - name: Fix reference headings
+        run: python .github/scripts/fix_purge_reference_numbering.py
+      - name: Commit reference correction
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/LANGUAGE_REFERENCE.md
+          git commit -m "Fix purge reference section numbering"
+          git push origin HEAD:promote-explicit-subtree-purge
