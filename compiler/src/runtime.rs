@@ -562,6 +562,7 @@ impl Runtime {
         })
     }
 
+    #[cfg(test)]
     fn transfer_runtime_model_owner(
         &mut self,
         identity: &str,
