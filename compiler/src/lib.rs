@@ -9,6 +9,8 @@ mod lifetime_termination_surface;
 pub mod live_designation_lowering;
 pub mod model_lowering;
 pub mod model_sequence_integration;
+#[cfg(test)]
+mod model_sequence_provenance_tests;
 mod model_types;
 pub mod parser;
 mod program_facts;
@@ -109,11 +111,17 @@ pub fn check_source_with_runtime_models(source: &str) -> Result<CheckedSource, V
     )?;
     let reduction_prepared = reduction_integration::lower(&structural_edit_prepared)?;
     let filter_prepared = filter_integration::lower(&reduction_prepared)?;
-    let model_sequence_lowered = model_sequence_integration::lower(&filter_prepared)?;
+    let model_sequence_integration::ModelSequenceLowering {
+        program: model_sequence_lowered,
+        externalized_sequences,
+    } = model_sequence_integration::lower(&filter_prepared)?;
     let runtime_index_grants =
         runtime_index_grant_transport::lower(&model_sequence_lowered, &runtime_model_templates)?;
-    let sequence_lowered =
-        sequence_lowering::lower(&runtime_index_grants, &runtime_model_templates)?;
+    let sequence_lowered = sequence_lowering::lower(
+        &runtime_index_grants,
+        &runtime_model_templates,
+        &externalized_sequences,
+    )?;
 
     // Preserve owner-relative model-sequence reductions for structural runtime
     // execution while lowering every other reduction through the existing

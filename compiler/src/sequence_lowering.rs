@@ -7,7 +7,7 @@ use crate::ast::{
 };
 use crate::diagnostic::Diagnostic;
 use crate::filter_integration::MODEL_FILTER_BINDING_PREFIX;
-use crate::model_sequence_integration::MODEL_SEQUENCE_BINDING_PREFIX;
+use crate::model_sequence_integration::ExternalizedModelSequence;
 use crate::program_facts::{
     ModelFacts as ModelInfo, ModelMemberKind as MemberKind, ModeledStateRoot as RootInfo,
     ProgramFacts,
@@ -35,6 +35,7 @@ struct SequenceInfo {
     declaration_index: usize,
     candidates: HashSet<String>,
     variants: Vec<SequenceVariant>,
+    externalized_model_member: bool,
 }
 
 struct LoweringContext<'a> {
@@ -56,6 +57,7 @@ struct IndexedPath<'a> {
 pub fn lower(
     program: &Program,
     runtime_model_templates: &HashMap<String, RuntimeModelTemplate>,
+    externalized_sequences: &HashMap<String, ExternalizedModelSequence>,
 ) -> Result<Program, Vec<Diagnostic>> {
     let facts = ProgramFacts::from_program(program);
     let models = facts.models();
@@ -63,7 +65,7 @@ pub fn lower(
     let mut errors = Vec::new();
 
     reject_deferred_sequence_positions(program, &mut errors);
-    let sequences = collect_sequences(program, models, roots, &mut errors);
+    let sequences = collect_sequences(program, models, roots, externalized_sequences, &mut errors);
     let filter_views = collect_filter_views(program);
     let designation_models = collect_designation_models(program);
 
@@ -222,6 +224,7 @@ fn collect_sequences(
     program: &Program,
     models: &HashMap<String, ModelInfo>,
     roots: &[RootInfo],
+    externalized_sequences: &HashMap<String, ExternalizedModelSequence>,
     errors: &mut Vec<Diagnostic>,
 ) -> HashMap<String, SequenceInfo> {
     let mut result = HashMap::new();
@@ -283,6 +286,25 @@ fn collect_sequences(
             errors,
         );
 
+        let externalized = externalized_sequences.get(&state.name);
+        if let Some(provenance) = externalized {
+            if provenance.element_model != model_name {
+                errors.push(diag(
+                    state.location,
+                    format!(
+                        "internal model-sequence provenance mismatch for {}.{} on root {}: owner model {} records live {} but binding {} has live {}",
+                        provenance.owner_model,
+                        provenance.member_name,
+                        provenance.owner_root,
+                        provenance.owner_model,
+                        provenance.element_model,
+                        state.name,
+                        model_name
+                    ),
+                ));
+            }
+        }
+
         result.insert(
             state.name.clone(),
             SequenceInfo {
@@ -291,6 +313,7 @@ fn collect_sequences(
                 declaration_index,
                 candidates,
                 variants,
+                externalized_model_member: externalized.is_some(),
             },
         );
     }
@@ -499,7 +522,7 @@ fn lower_expr(
                     ));
                 }
                 let Some(member) = path.member else {
-                    if info.name.starts_with(MODEL_SEQUENCE_BINDING_PREFIX) {
+                    if info.externalized_model_member {
                         return Expr::RuntimeIndexDesignation {
                             source: Box::new(Expr::Name(info.name.clone())),
                             index: Box::new(Expr::Integer(path.index as i64)),
@@ -731,7 +754,7 @@ fn lower_indexed_member_read(
     context: &LoweringContext<'_>,
     errors: &mut Vec<Diagnostic>,
 ) -> Expr {
-    if info.name.starts_with(MODEL_SEQUENCE_BINDING_PREFIX) {
+    if info.externalized_model_member {
         let Some(template) = context.runtime_model_templates.get(&info.model_name) else {
             errors.push(diag(
                 location,
@@ -848,7 +871,7 @@ fn lower_runtime_indexed_designation(
         ));
         return Expr::String(String::new());
     };
-    if !info.name.starts_with(MODEL_SEQUENCE_BINDING_PREFIX) {
+    if !info.externalized_model_member {
         errors.push(diag(
             location,
             "runtime whole-designation indexing is currently supported only for owner-relative runtime-sized membership",
@@ -924,7 +947,7 @@ fn lower_runtime_indexed_member_read(
         ));
         return Expr::Integer(0);
     };
-    if !info.name.starts_with(MODEL_SEQUENCE_BINDING_PREFIX) {
+    if !info.externalized_model_member {
         errors.push(diag(
             location,
             "runtime index expressions are currently supported only for owner-relative state-model sequence members",
@@ -1099,7 +1122,7 @@ fn lower_through_assignment(
         };
     };
 
-    if info.name.starts_with(MODEL_SEQUENCE_BINDING_PREFIX) {
+    if info.externalized_model_member {
         let Some(template) = context.runtime_model_templates.get(&info.model_name) else {
             errors.push(diag(
                 location,
@@ -1270,7 +1293,7 @@ fn lower_runtime_indexed_through_assignment(
             value,
         };
     };
-    if !info.name.starts_with(MODEL_SEQUENCE_BINDING_PREFIX) {
+    if !info.externalized_model_member {
         errors.push(diag(
             location,
             "runtime index expressions are currently supported only for owner-relative state-model sequence members",
