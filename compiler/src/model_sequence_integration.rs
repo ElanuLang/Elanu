@@ -12,7 +12,7 @@ use crate::sequence_surface::{decode_sequence_literal, decode_sequence_live_type
 pub(crate) const MODEL_SEQUENCE_BINDING_PREFIX: &str = "__meld_mseq$";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ExternalizedModelSequence {
+pub struct ExternalizedModelSequence {
     pub(crate) owner_root: String,
     pub(crate) owner_model: String,
     pub(crate) member_name: String,
@@ -20,7 +20,7 @@ pub(crate) struct ExternalizedModelSequence {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct ModelSequenceLowering {
+pub struct ModelSequenceLowering {
     pub(crate) program: Program,
     pub(crate) externalized_sequences: HashMap<String, ExternalizedModelSequence>,
 }
