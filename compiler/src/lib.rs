@@ -15,6 +15,8 @@ pub mod model_sequence_integration;
 #[cfg(test)]
 mod model_sequence_provenance_tests;
 mod model_types;
+#[cfg(test)]
+mod nested_folder_composition_tests;
 pub mod parser;
 mod program_facts;
 pub mod reduction_integration;
