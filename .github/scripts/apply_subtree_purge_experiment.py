@@ -161,7 +161,7 @@ action seedSubtree {
 }
 
 action pinChild {
-    required = child
+    required = root.children[0]
 }
 "#;
 
