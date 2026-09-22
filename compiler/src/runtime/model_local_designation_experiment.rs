@@ -105,9 +105,18 @@ fn per_identity_model_member_state_can_reuse_existing_optional_designation_clean
         "Folder",
     );
 
-    assert_ne!(slot_a, slot_b, "each modeled identity must own a distinct slot");
-    assert_eq!(runtime.value(&slot_a).unwrap(), Value::String(String::new()));
-    assert_eq!(runtime.value(&slot_b).unwrap(), Value::String(String::new()));
+    assert_ne!(
+        slot_a, slot_b,
+        "each modeled identity must own a distinct slot"
+    );
+    assert_eq!(
+        runtime.value(&slot_a).unwrap(),
+        Value::String(String::new())
+    );
+    assert_eq!(
+        runtime.value(&slot_b).unwrap(),
+        Value::String(String::new())
+    );
 
     run_test_transaction(&mut runtime, |runtime| {
         runtime.write_state(&slot_a, Value::String(target.clone()))
@@ -118,8 +127,14 @@ fn per_identity_model_member_state_can_reuse_existing_optional_designation_clean
         runtime.value(&slot_a).unwrap(),
         Value::String(target.clone())
     );
-    assert_eq!(runtime.value(&slot_b).unwrap(), Value::String(String::new()));
-    assert_eq!(runtime.current_dynamic_model_owner(&target).as_deref(), Some("workspace"));
+    assert_eq!(
+        runtime.value(&slot_b).unwrap(),
+        Value::String(String::new())
+    );
+    assert_eq!(
+        runtime.current_dynamic_model_owner(&target).as_deref(),
+        Some("workspace")
+    );
 
     run_test_transaction(&mut runtime, |runtime| {
         runtime.write_state(&slot_b, Value::String(target.clone()))
@@ -131,8 +146,14 @@ fn per_identity_model_member_state_can_reuse_existing_optional_designation_clean
     })
     .expect("existing lifetime cleanup should clear model-local optional designations");
 
-    assert_eq!(runtime.value(&slot_a).unwrap(), Value::String(String::new()));
-    assert_eq!(runtime.value(&slot_b).unwrap(), Value::String(String::new()));
+    assert_eq!(
+        runtime.value(&slot_a).unwrap(),
+        Value::String(String::new())
+    );
+    assert_eq!(
+        runtime.value(&slot_b).unwrap(),
+        Value::String(String::new())
+    );
     assert!(!runtime.model_identity_exists(&target));
     assert!(runtime.model_identity_exists(&holder_a));
     assert!(runtime.model_identity_exists(&holder_b));
@@ -171,8 +192,14 @@ fn aborted_target_termination_restores_model_local_optional_designation_slots() 
     runtime
         .terminate_runtime_model(&target, "workspace")
         .expect("termination should stage cleanup");
-    assert_eq!(runtime.value(&slot_a).unwrap(), Value::String(String::new()));
-    assert_eq!(runtime.value(&slot_b).unwrap(), Value::String(String::new()));
+    assert_eq!(
+        runtime.value(&slot_a).unwrap(),
+        Value::String(String::new())
+    );
+    assert_eq!(
+        runtime.value(&slot_b).unwrap(),
+        Value::String(String::new())
+    );
     runtime.transaction = None;
 
     assert!(runtime.model_identity_exists(&target));
