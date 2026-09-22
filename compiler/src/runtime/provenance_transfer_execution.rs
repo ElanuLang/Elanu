@@ -254,3 +254,156 @@ fn same_owner_transfer_is_a_valid_no_op_after_provenance_validation() {
         Some("left")
     );
 }
+
+#[test]
+fn nonleaf_experiment_changes_only_parent_edge_and_preserves_descendant_provenance() {
+    let mut runtime = runtime(SOURCE);
+    runtime.run_action("seed").expect("seed should commit");
+    let identity = targets(&mut runtime, "__meld_mseq$left$documents")[0].clone();
+
+    runtime.transaction = Some(Transaction::default());
+    let descendant = runtime
+        .instantiate_runtime_model("Document", &identity)
+        .expect("transferred identity should be usable as a runtime owner");
+    let created = runtime
+        .transaction
+        .take()
+        .expect("transaction should exist");
+    runtime.commit(created);
+
+    run_test_transaction(&mut runtime, |runtime| {
+        runtime.transfer_runtime_model_owner_nonleaf_experiment(&identity, "left", "right")?;
+        assert_eq!(
+            runtime.current_dynamic_model_owner(&identity).as_deref(),
+            Some("right")
+        );
+        assert_eq!(
+            runtime.current_dynamic_model_owner(&descendant).as_deref(),
+            Some(identity.as_str())
+        );
+        Ok(())
+    })
+    .expect("acyclic non-leaf parent-edge transfer should commit");
+
+    assert_eq!(
+        runtime.current_dynamic_model_owner(&identity).as_deref(),
+        Some("right")
+    );
+    assert_eq!(
+        runtime.current_dynamic_model_owner(&descendant).as_deref(),
+        Some(identity.as_str())
+    );
+}
+
+#[test]
+fn nonleaf_experiment_rollback_restores_parent_edge_without_touching_descendant_edge() {
+    let mut runtime = runtime(SOURCE);
+    runtime.run_action("seed").expect("seed should commit");
+    let identity = targets(&mut runtime, "__meld_mseq$left$documents")[0].clone();
+
+    runtime.transaction = Some(Transaction::default());
+    let descendant = runtime
+        .instantiate_runtime_model("Document", &identity)
+        .expect("transferred identity should be usable as a runtime owner");
+    let created = runtime
+        .transaction
+        .take()
+        .expect("transaction should exist");
+    runtime.commit(created);
+
+    runtime.transaction = Some(Transaction::default());
+    runtime
+        .transfer_runtime_model_owner_nonleaf_experiment(&identity, "left", "right")
+        .expect("acyclic non-leaf transfer should stage");
+    assert_eq!(
+        runtime.current_dynamic_model_owner(&identity).as_deref(),
+        Some("right")
+    );
+    assert_eq!(
+        runtime.current_dynamic_model_owner(&descendant).as_deref(),
+        Some(identity.as_str())
+    );
+    runtime.transaction = None;
+
+    assert_eq!(
+        runtime.current_dynamic_model_owner(&identity).as_deref(),
+        Some("left")
+    );
+    assert_eq!(
+        runtime.current_dynamic_model_owner(&descendant).as_deref(),
+        Some(identity.as_str())
+    );
+}
+
+#[test]
+fn nonleaf_experiment_rejects_destination_descendant_cycle() {
+    let mut runtime = runtime(SOURCE);
+    runtime.run_action("seed").expect("seed should commit");
+    let identity = targets(&mut runtime, "__meld_mseq$left$documents")[0].clone();
+
+    runtime.transaction = Some(Transaction::default());
+    let descendant = runtime
+        .instantiate_runtime_model("Document", &identity)
+        .expect("transferred identity should be usable as a runtime owner");
+    let created = runtime
+        .transaction
+        .take()
+        .expect("transaction should exist");
+    runtime.commit(created);
+
+    let error = run_test_transaction(&mut runtime, |runtime| {
+        runtime.transfer_runtime_model_owner_nonleaf_experiment(&identity, "left", &descendant)
+    })
+    .expect_err("destination descendant must be rejected to preserve acyclic provenance");
+
+    assert!(error.message.contains("would create an owner cycle"));
+    assert_eq!(
+        runtime.current_dynamic_model_owner(&identity).as_deref(),
+        Some("left")
+    );
+    assert_eq!(
+        runtime.current_dynamic_model_owner(&descendant).as_deref(),
+        Some(identity.as_str())
+    );
+}
+
+#[test]
+fn nonleaf_experiment_cycle_check_observes_staged_owner_changes() {
+    let mut runtime = runtime(SOURCE);
+    runtime.run_action("seed").expect("seed should commit");
+    let identity = targets(&mut runtime, "__meld_mseq$left$documents")[0].clone();
+
+    runtime.transaction = Some(Transaction::default());
+    let candidate_destination = runtime
+        .instantiate_runtime_model("Document", "right")
+        .expect("candidate destination should be a committed dynamic identity");
+    let created = runtime
+        .transaction
+        .take()
+        .expect("transaction should exist");
+    runtime.commit(created);
+
+    runtime.transaction = Some(Transaction::default());
+    runtime
+        .transfer_runtime_model_owner(&candidate_destination, "right", &identity)
+        .expect("leaf transfer should stage candidate beneath the identity");
+    assert_eq!(
+        runtime
+            .current_dynamic_model_owner(&candidate_destination)
+            .as_deref(),
+        Some(identity.as_str())
+    );
+
+    let error = runtime
+        .transfer_runtime_model_owner_nonleaf_experiment(&identity, "left", &candidate_destination)
+        .expect_err("cycle check must observe the staged destination ancestry");
+    assert!(error.message.contains("would create an owner cycle"));
+
+    runtime.transaction = None;
+    assert_eq!(
+        runtime
+            .current_dynamic_model_owner(&candidate_destination)
+            .as_deref(),
+        Some("right")
+    );
+}
