@@ -16,7 +16,9 @@ jobs:
         with:
           ref: model-local-maybe-live-source
       - name: Apply bounded compiler promotion
-        run: python .github/scripts/promote_model_local_maybe_live.py
+        run: |
+          python .github/scripts/enable_model_local_maybe_live_parser.py
+          python .github/scripts/promote_model_local_maybe_live.py
       - name: Format and run focused semantic tests
         run: |
           cd compiler
@@ -30,6 +32,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add compiler/src/model_types.rs compiler/src/runtime_model_templates.rs compiler/src/model_lowering.rs compiler/src/designation_runtime_metadata.rs compiler/src/lib.rs compiler/src/runtime.rs compiler/src/live_designation_lowering.rs compiler/src/trash_restore_pressure_tests.rs
+          git add compiler/src/parser.rs compiler/src/model_types.rs compiler/src/runtime_model_templates.rs compiler/src/model_lowering.rs compiler/src/designation_runtime_metadata.rs compiler/src/lib.rs compiler/src/runtime.rs compiler/src/live_designation_lowering.rs compiler/src/trash_restore_pressure_tests.rs
           git commit -m "Add model-local optional live designation state"
           git push origin HEAD:model-local-maybe-live-source
