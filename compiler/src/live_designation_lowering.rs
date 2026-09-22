@@ -1472,6 +1472,7 @@ fn expand_action_call(
             ActionArgument::Value(Expr::Name(source_name))
                 if (name == crate::lifetime_transfer_surface::TRANSFER_BUILTIN_ACTION
                     || name == crate::lifetime_termination_surface::DESTROY_BUILTIN_ACTION
+                    || name == crate::lifetime_termination_surface::PURGE_BUILTIN_ACTION
                     || name == crate::scoped_create_surface::CREATE_SCOPE_BUILTIN_ACTION
                     || name.starts_with(
                         crate::existing_designation_insert_surface::GENERATED_EXISTING_INSERT_ACTION_PREFIX,

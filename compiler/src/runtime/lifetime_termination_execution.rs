@@ -300,6 +300,10 @@ action seedSubtree {
 action pinChild {
     required = root.children[0]
 }
+
+action purgeRoot {
+    purge root in left
+}
 "#;
 
 fn designation_target(runtime: &mut Runtime, name: &str) -> String {
@@ -325,7 +329,7 @@ fn subtree_purge_experiment_reuses_leaf_cleanup_for_entire_provenance_subtree() 
     let outsider = designation_target(&mut runtime, "outsider");
 
     run_test_transaction(&mut runtime, |runtime| {
-        runtime.terminate_runtime_model_subtree_experiment(&root, "left")
+        runtime.terminate_runtime_model_subtree(&root, "left")
     })
     .expect("committed provenance subtree should purge leaves-first");
 
@@ -365,7 +369,7 @@ fn subtree_purge_experiment_rolls_back_the_complete_subtree() {
 
     runtime.transaction = Some(Transaction::default());
     runtime
-        .terminate_runtime_model_subtree_experiment(&root, "left")
+        .terminate_runtime_model_subtree(&root, "left")
         .expect("subtree purge should stage");
     assert!(!runtime.model_identity_exists(&root));
     assert!(!runtime.model_identity_exists(&child));
@@ -395,7 +399,7 @@ fn subtree_purge_experiment_plain_live_descendant_blocks_and_rolls_back() {
     let grandchild = designation_target(&mut runtime, "grandchild");
 
     let error = run_test_transaction(&mut runtime, |runtime| {
-        runtime.terminate_runtime_model_subtree_experiment(&root, "left")
+        runtime.terminate_runtime_model_subtree(&root, "left")
     })
     .expect_err("plain live descendant designation must block the whole purge");
 
@@ -419,7 +423,7 @@ fn subtree_purge_experiment_observes_staged_transfer_out() {
 
     run_test_transaction(&mut runtime, |runtime| {
         runtime.transfer_runtime_model_owner(&child, &root, "right")?;
-        runtime.terminate_runtime_model_subtree_experiment(&root, "left")
+        runtime.terminate_runtime_model_subtree(&root, "left")
     })
     .expect("child transferred out before purge should survive with its descendants");
 
@@ -448,7 +452,7 @@ fn subtree_purge_experiment_observes_staged_transfer_in() {
 
     run_test_transaction(&mut runtime, |runtime| {
         runtime.transfer_runtime_model_owner(&outsider, "right", &root)?;
-        runtime.terminate_runtime_model_subtree_experiment(&root, "left")
+        runtime.terminate_runtime_model_subtree(&root, "left")
     })
     .expect("committed child transferred into subtree should join the purge");
 
@@ -474,7 +478,7 @@ fn subtree_purge_experiment_rejects_fresh_transaction_local_descendant() {
         .expect("fresh descendant should instantiate");
 
     let error = runtime
-        .terminate_runtime_model_subtree_experiment(&root, "left")
+        .terminate_runtime_model_subtree(&root, "left")
         .expect_err("fresh descendant cancellation remains unselected");
     assert!(error
         .message
@@ -485,4 +489,30 @@ fn subtree_purge_experiment_rejects_fresh_transaction_local_descendant() {
     runtime.transaction = None;
     assert!(runtime.model_identity_exists(&root));
     assert!(!runtime.model_identity_exists(&fresh));
+}
+
+#[test]
+fn compiler_accepted_purge_ends_the_current_committed_provenance_subtree() {
+    let mut runtime = runtime(SUBTREE_PURGE_SOURCE);
+    runtime
+        .run_action("seedSubtree")
+        .expect("subtree source should seed");
+
+    let root = designation_target(&mut runtime, "root");
+    let child = designation_target(&mut runtime, "child");
+    let grandchild = designation_target(&mut runtime, "grandchild");
+    let outsider = designation_target(&mut runtime, "outsider");
+
+    runtime
+        .run_action("purgeRoot")
+        .expect("compiler-accepted purge should terminate the lifetime subtree");
+
+    assert!(!runtime.model_identity_exists(&root));
+    assert!(!runtime.model_identity_exists(&child));
+    assert!(!runtime.model_identity_exists(&grandchild));
+    assert!(runtime.model_identity_exists(&outsider));
+    assert_eq!(
+        runtime.value("__meld_live$root").unwrap(),
+        Value::String(String::new())
+    );
 }

@@ -1205,7 +1205,51 @@ and carrier representations are not language law.
 
 ---
 
-# 19. Owner-relative child lifetime `transfer` — provisional/implemented
+# 19. Explicit lifetime-subtree `purge` — provisional/implemented
+
+Elanu accepts an explicit operation for permanently ending one committed dynamic lifetime subtree:
+
+```elanu
+purge selectedFolder in trashFolder
+```
+
+`purge` is intentionally distinct from leaf-only `destroy`. `destroy` requests termination of exactly
+one identity and fails while that identity still roots another live child. `purge` explicitly requests
+termination of the selected identity plus all committed dynamic identities transitively rooted beneath
+it in the current transaction-visible lifetime-provenance relation.
+
+Current contract:
+
+- the target must be persistent `maybe live T` designation state and must be present at execution;
+- the target must designate an existing committed dynamic identity;
+- the owner operand must prove the target's exact current root-provenance owner and may be a static
+  modeled root or persistent live owner designation;
+- descendants are selected from compiler-owned lifetime provenance, never from structural membership;
+- committed descendants are terminated leaves-first through the same per-identity cleanup law used by
+  leaf `destroy`;
+- staged provenance transfers earlier in the same action affect the purge set: a committed branch moved
+  out survives, while a committed identity moved into the subtree joins the purge;
+- every terminated identity receives the existing lifetime cleanup: all structural occurrences are
+  removed, persistent `maybe live T` designations are cleared, model-local state/derived state end, and
+  its provenance edge ends;
+- any persistent plain `live T` designation targeting any identity in the selected subtree blocks the
+  whole purge rather than becoming dangling;
+- a fresh transaction-local descendant anywhere in the selected subtree currently blocks purge because
+  fresh-child cancellation/termination remains unselected;
+- purge participates in the surrounding action transaction, so any failure rolls the entire subtree
+  transition and all other staged work back.
+
+Moving a folder to Trash does not imply purge. A rooted hierarchy may be moved cheaply by provenance
+transfer plus structural edits while all descendants remain live. `purge` represents the stronger,
+explicit application intent that the lifetime subtree itself permanently ends.
+
+`purge` does not add structural tree traversal, descendant reparenting, garbage collection, reference
+counting, external-resource cleanup, persistence deletion policy, or a public ownership/provenance
+API. Its subtree is the current lifetime-provenance subtree, not a collection-membership subtree.
+
+---
+
+# 20. Owner-relative child lifetime `transfer` — provisional/implemented
 
 Elanu accepts one narrow operation that changes the lifetime/root provenance of an existing
 committed dynamic child without changing that child's identity:
@@ -1264,7 +1308,7 @@ overlays are not language law.
 
 ---
 
-# 20. Read-only `reduce` — v0.8.0 provisional/implemented
+# 21. Read-only `reduce` — v0.8.0 provisional/implemented
 
 The current reduction surface is:
 
@@ -1302,7 +1346,7 @@ The current reduction parser/transport still contains bootstrap architecture tha
 
 ---
 
-# 21. Derived `filter` and ordered views — provisional/implemented
+# 22. Derived `filter` and ordered views — provisional/implemented
 
 The base derived-filter surface is:
 
@@ -1382,7 +1426,7 @@ language. Those mechanisms remain unselected.
 
 ---
 
-# 22. Filter → reduction composition — v0.8.0
+# 23. Filter → reduction composition — v0.8.0
 
 Representative end-to-end program shape:
 
@@ -1435,7 +1479,7 @@ derived view itself mutable merely because its value type matches stored members
 
 ---
 
-# 23. What is not currently language surface
+# 24. What is not currently language surface
 
 The current compiler/language should **not** be read as already containing any of the following:
 
@@ -1475,7 +1519,7 @@ Owner-relative creation, structural insertion/removal, owner-relative committed-
 
 ---
 
-# 24. Implementation boundaries are not language law
+# 25. Implementation boundaries are not language law
 
 The current compiler still contains bootstrap mechanisms including preprocessing, generated hidden bindings, specialized lowering passes, compiler-private builtin transport, and older String transports for some structural surfaces.
 

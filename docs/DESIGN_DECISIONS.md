@@ -454,6 +454,61 @@ Boundaries:
 
 Revisit only when realistic composition demonstrates one of those stronger facts is needed.
 
+## Explicit purge ends a transaction-visible lifetime-provenance subtree
+
+Decision:
+
+```elanu
+purge selected in owner
+```
+
+is the explicit subtree-ending counterpart to leaf-only `destroy`.
+
+The durable semantic distinction is:
+
+```text
+destroy child in owner
+    -> end exactly this committed identity
+    -> fail if it still roots a live dynamic child
+
+purge child in owner
+    -> intentionally end this committed identity
+       plus all committed transaction-visible provenance descendants
+```
+
+The purge set is defined by lifetime/root provenance, not structural membership. Cross-owner,
+duplicate, filtered, or absent structural occurrences neither grant lifetime authority nor determine
+which descendants die.
+
+Runtime pressure established that no second cleanup mechanism is required. The compiler/runtime
+orders the current committed provenance subtree leaves-first and applies the existing leaf lifetime
+termination transition to every identity. As a result, the established cleanup law is preserved for
+each descendant: optional designations clear, all structural occurrences disappear, model-local state
+ends, and plain `live T` designations continue to block termination rather than dangling.
+
+The subtree is transaction-visible. A committed branch transferred out before purge survives; a
+committed identity transferred into the subtree before purge participates. Any failure during the
+leaves-first sequence rolls all earlier staged terminations back with the surrounding action.
+
+Fresh transaction-local descendants remain outside the selected semantic. If one is rooted in the
+selected subtree, purge fails rather than silently inventing fresh-child cancellation.
+
+Rationale:
+
+Application code cannot enumerate an arbitrary runtime-sized lifetime subtree from current public
+primitives without mirroring the compiler-owned provenance relation. Structural membership cannot be
+used as a substitute because membership is deliberately non-owning. The compiler also already owns
+the global cleanup consequences of lifetime termination. Explicit purge therefore removes duplicated
+lifetime reconstruction while keeping product policy such as when to empty Trash outside the language.
+
+The separate source operation is intentional. Making `destroy` silently recursive would turn a request
+to end one identity into potentially unbounded descendant deletion. Retaining leaf `destroy` preserves
+a useful failure boundary; `purge` states the stronger destructive intent explicitly.
+
+This decision does not select implicit purge on Trash movement, fresh-child cancellation, descendant
+reparenting, garbage collection/reference counting, external-resource cleanup, persistence deletion
+policy, asynchronous deletion, or a public provenance/tree traversal API.
+
 ## Lifetime provenance transfer is independent from structural movement
 
 Folder/document composition established one application fact that cannot be reproduced by

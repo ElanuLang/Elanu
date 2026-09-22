@@ -644,8 +644,7 @@ impl Runtime {
         }
     }
 
-    #[cfg(test)]
-    fn committed_provenance_subtree_postorder_experiment(
+    fn committed_provenance_subtree_postorder(
         &self,
         root: &str,
     ) -> Result<Vec<String>, RuntimeError> {
@@ -708,8 +707,7 @@ impl Runtime {
         Ok(postorder)
     }
 
-    #[cfg(test)]
-    fn terminate_runtime_model_subtree_experiment(
+    fn terminate_runtime_model_subtree(
         &mut self,
         identity: &str,
         claimed_owner: &str,
@@ -725,7 +723,7 @@ impl Runtime {
             )));
         }
 
-        let postorder = self.committed_provenance_subtree_postorder_experiment(identity)?;
+        let postorder = self.committed_provenance_subtree_postorder(identity)?;
         for target in postorder {
             let owner = self.current_dynamic_model_owner(&target).ok_or_else(|| {
                 RuntimeError::new(format!(
@@ -989,6 +987,46 @@ impl Runtime {
         self.terminate_runtime_model(&target, &owner)
     }
 
+    fn invoke_purge_builtin(&mut self, arguments: &[ActionArgument]) -> Result<(), RuntimeError> {
+        let [ActionArgument::Value(target), ActionArgument::Value(owner)] = arguments else {
+            return Err(RuntimeError::new(
+                "internal subtree-purge builtin expects designation and owner",
+            ));
+        };
+
+        let target = match self.eval_expr(target, None)? {
+            Value::String(target) => target,
+            other => {
+                return Err(RuntimeError::new(format!(
+                    "internal subtree-purge designation must be String, got {}",
+                    other.type_name()
+                )))
+            }
+        };
+        if target.is_empty() {
+            return Err(RuntimeError::new(
+                "purge requires a present maybe live designation",
+            ));
+        }
+
+        let owner = match self.eval_expr(owner, None)? {
+            Value::String(owner) if owner.is_empty() => {
+                return Err(RuntimeError::new(
+                    "purge requires a present live owner designation",
+                ))
+            }
+            Value::String(owner) => owner,
+            other => {
+                return Err(RuntimeError::new(format!(
+                    "internal subtree-purge owner must be String, got {}",
+                    other.type_name()
+                )))
+            }
+        };
+
+        self.terminate_runtime_model_subtree(&target, &owner)
+    }
+
     fn invoke_action(
         &mut self,
         name: &str,
@@ -999,6 +1037,9 @@ impl Runtime {
         }
         if name == crate::lifetime_termination_surface::DESTROY_BUILTIN_ACTION {
             return self.invoke_destroy_builtin(arguments);
+        }
+        if name == crate::lifetime_termination_surface::PURGE_BUILTIN_ACTION {
+            return self.invoke_purge_builtin(arguments);
         }
         if name == crate::create_surface::CREATE_BUILTIN_ACTION {
             return self.invoke_create_builtin(arguments);

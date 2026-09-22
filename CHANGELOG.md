@@ -4,6 +4,8 @@
 
 ### Language and semantics
 
+- Added explicit `purge target in owner` for permanent termination of a committed transaction-visible lifetime-provenance subtree while retaining leaf-only `destroy` as a separate operation.
+- Purge discovers descendants from provenance rather than structure, reuses existing leaf cleanup leaves-first, observes staged transfers, blocks on plain-live designations, and rejects fresh transaction-local descendants.
 - Broadened existing lifetime `transfer` from leaf-only children to any committed dynamic identity when replacing its parent provenance edge preserves an acyclic transaction-visible provenance relation.
 - Non-leaf transfer preserves all descendant provenance edges; it is parent-edge replacement, not subtree migration, and `destroy` remains leaf-only.
 - Extended existing-designation structural insertion/removal to mutable membership owned by exact runtime-selected modeled identities carried through persistent live designations.
@@ -34,6 +36,7 @@
 
 ### Compiler/runtime
 
+- Promoted the proven provenance-subtree post-order termination experiment into the runtime and routed explicit source `purge` through the existing lifetime-termination surface and per-identity cleanup path.
 - Promoted the proven transaction-visible destination-owner-chain cycle check into production transfer and removed the duplicate test-only non-leaf transfer implementation.
 - Added transaction-visible dynamic-owner replacement so later lifetime checks in the same action observe staged provenance transfer and rollback discards it cleanly.
 - Reused persistent designation lowering and explicit owner identity transport rather than reconstructing provenance from generated names or structural membership.
