@@ -19,6 +19,7 @@ jobs:
         run: |
           python .github/scripts/wire_selected_designation_materialization.py
           python .github/scripts/fix_selected_designation_format.py
+          python .github/scripts/stabilize_selected_designation_format.py
       - name: Validate compiler
         working-directory: compiler
         run: |
