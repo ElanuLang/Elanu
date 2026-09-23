@@ -89,7 +89,10 @@ impl Runtime {
         }
 
         for (identity, dynamic) in &checkpoint.dynamic_models {
-            if !self.runtime_model_templates.contains_key(&dynamic.model_name) {
+            if !self
+                .runtime_model_templates
+                .contains_key(&dynamic.model_name)
+            {
                 return Err(RuntimeError::new(format!(
                     "restart checkpoint references unknown state model '{}'",
                     dynamic.model_name
@@ -311,8 +314,14 @@ fn checkpoint_restores_committed_identity_state_structure_designation_and_proven
         .run_action("failedRename")
         .expect_err("failed work must not become committed restart state");
 
-    assert_eq!(original.value("selectedInSource").unwrap(), Value::Bool(false));
-    assert_eq!(original.value("selectedInTrash").unwrap(), Value::Bool(true));
+    assert_eq!(
+        original.value("selectedInSource").unwrap(),
+        Value::Bool(false)
+    );
+    assert_eq!(
+        original.value("selectedInTrash").unwrap(),
+        Value::Bool(true)
+    );
     assert_eq!(
         original.value("selectedName").unwrap(),
         Value::String("Project".to_string())
@@ -340,9 +349,18 @@ fn checkpoint_restores_committed_identity_state_structure_designation_and_proven
 
     assert_eq!(restarted.dynamic_model_owners, original_owners);
     assert_eq!(restarted.dynamic_model_types, original_types);
-    assert_eq!(restarted.next_dynamic_identity, checkpoint.next_dynamic_identity);
-    assert_eq!(restarted.value("selectedInSource").unwrap(), Value::Bool(false));
-    assert_eq!(restarted.value("selectedInTrash").unwrap(), Value::Bool(true));
+    assert_eq!(
+        restarted.next_dynamic_identity,
+        checkpoint.next_dynamic_identity
+    );
+    assert_eq!(
+        restarted.value("selectedInSource").unwrap(),
+        Value::Bool(false)
+    );
+    assert_eq!(
+        restarted.value("selectedInTrash").unwrap(),
+        Value::Bool(true)
+    );
     assert_eq!(restarted.derived_evaluations("selectedInTrash"), Some(1));
     assert_eq!(
         restarted.value("selectedName").unwrap(),
@@ -356,8 +374,14 @@ fn checkpoint_restores_committed_identity_state_structure_designation_and_proven
     restarted
         .run_action("restoreFromTrash")
         .expect("restored model-local parent designation should drive restore");
-    assert_eq!(restarted.value("selectedInSource").unwrap(), Value::Bool(true));
-    assert_eq!(restarted.value("selectedInTrash").unwrap(), Value::Bool(false));
+    assert_eq!(
+        restarted.value("selectedInSource").unwrap(),
+        Value::Bool(true)
+    );
+    assert_eq!(
+        restarted.value("selectedInTrash").unwrap(),
+        Value::Bool(false)
+    );
 
     restarted
         .run_action("staleOwnerProof")
@@ -376,7 +400,10 @@ fn checkpoint_restores_committed_identity_state_structure_designation_and_proven
         .filter(|identity| !original_ids.contains(*identity))
         .collect::<Vec<_>>();
     assert_eq!(new_ids.len(), 1);
-    assert_eq!(restarted.next_dynamic_identity, checkpoint.next_dynamic_identity + 1);
+    assert_eq!(
+        restarted.next_dynamic_identity,
+        checkpoint.next_dynamic_identity + 1
+    );
 }
 
 #[test]
@@ -387,7 +414,10 @@ fn checkpoint_rejects_active_transaction_and_does_not_capture_staged_work() {
 
     runtime.transaction = Some(Transaction::default());
     runtime
-        .write_state("__meld_live$restoreDestination", Value::String("staged".to_string()))
+        .write_state(
+            "__meld_live$restoreDestination",
+            Value::String("staged".to_string()),
+        )
         .expect("test staging should write inside transaction");
     let error = runtime
         .capture_restart_checkpoint()
