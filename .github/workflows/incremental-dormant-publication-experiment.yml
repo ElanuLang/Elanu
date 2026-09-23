@@ -1,0 +1,36 @@
+name: Incremental dormant publication experiment
+
+on:
+  push:
+    branches:
+      - incremental-dormant-publication-experiment
+
+permissions:
+  contents: write
+
+jobs:
+  experiment:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: incremental-dormant-publication-experiment
+      - name: Wire experiment
+        run: python .github/scripts/wire_incremental_dormant_publication_experiment.py
+      - name: Validate experiment
+        working-directory: compiler
+        run: |
+          cargo fmt
+          cargo fmt --check
+          cargo clippy -- -D warnings
+          cargo test incremental_dormant_publication_experiment
+          cargo build
+      - name: Commit experiment changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add compiler/src/runtime/persistence.rs compiler/src/runtime/persistence/incremental_dormant_publication_experiment.rs
+          if ! git diff --cached --quiet; then
+            git commit -m "Wire incremental dormant publication experiment"
+            git push origin HEAD:incremental-dormant-publication-experiment
+          fi
