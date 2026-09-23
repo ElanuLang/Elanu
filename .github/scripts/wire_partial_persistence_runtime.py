@@ -9,3 +9,54 @@ if "pub mod partial;" not in text:
         raise SystemExit("persistence module import anchor not found")
     text = text.replace(needle, insert, 1)
     path.write_text(text)
+
+partial = Path("compiler/src/runtime/persistence/partial.rs")
+text = partial.read_text()
+old = '''    fn keys_by_model(runtime: &PartialPersistentRuntime<MemoryProvider>) -> (Vec<u8>, Vec<u8>) {
+        let folder = runtime
+            .backed
+            .iter()
+            .find_map(|(_, handle)| {
+                (handle.model_name == "Folder" && handle.owner == "workspace")
+                    .then(|| encode_key(handle.token))
+            })
+            .expect("Cold/Active Folder backing should exist");
+        let document = runtime
+            .backed
+            .iter()
+            .find_map(|(_, handle)| {
+                (handle.model_name == "Document").then(|| encode_key(handle.token))
+            })
+            .expect("Document backing should exist");
+        (folder, document)
+    }
+'''
+new = '''    fn keys_by_model(runtime: &PartialPersistentRuntime<MemoryProvider>) -> (Vec<u8>, Vec<u8>) {
+        let cold_identity = match runtime
+            .runtime
+            .states
+            .get("coldFolder")
+            .map(|state| state.value.clone())
+        {
+            Some(Value::String(identity)) => identity,
+            other => panic!("coldFolder designation should carry one exact identity, got {other:?}"),
+        };
+        let folder = runtime
+            .backed
+            .get(&cold_identity)
+            .map(|handle| encode_key(handle.token))
+            .expect("coldFolder target should have opaque backing");
+        let document = runtime
+            .backed
+            .iter()
+            .find_map(|(_, handle)| {
+                (handle.model_name == "Document").then(|| encode_key(handle.token))
+            })
+            .expect("Document backing should exist");
+        (folder, document)
+    }
+'''
+if old in text:
+    partial.write_text(text.replace(old, new, 1))
+elif new not in text:
+    raise SystemExit("backing-key test helper anchor not found")
