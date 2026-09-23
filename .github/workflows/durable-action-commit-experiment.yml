@@ -1,0 +1,34 @@
+name: Durable action commit experiment
+
+on:
+  push:
+    branches:
+      - durable-action-commit-experiment
+
+permissions:
+  contents: write
+
+jobs:
+  experiment:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: durable-action-commit-experiment
+      - run: python .github/scripts/add_durable_action_commit_experiment.py
+      - name: Format and run durable commit tests
+        run: |
+          cd compiler
+          cargo fmt
+          cargo test runtime::restart_checkpoint_experiment::durable_ -- --nocapture
+          cargo test runtime::restart_checkpoint_experiment::rejected_dynamic_creation -- --nocapture
+          cargo test runtime::restart_checkpoint_experiment::semantic_failure_never_attempts -- --nocapture
+          cargo test runtime::restart_checkpoint_experiment::checkpoint_ -- --nocapture
+          cd ..
+      - name: Commit runtime-only experiment
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add compiler/src/runtime/restart_checkpoint_experiment.rs
+          git commit -m "Prove durable action commit boundary"
+          git push origin HEAD:durable-action-commit-experiment
