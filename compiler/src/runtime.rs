@@ -29,6 +29,8 @@ mod lifetime_termination_execution;
 #[cfg(test)]
 mod model_local_designation_experiment;
 #[cfg(test)]
+mod persistence_identity_metadata;
+#[cfg(test)]
 mod provenance_transfer_execution;
 #[cfg(test)]
 mod structural_move_execution;
@@ -143,6 +145,7 @@ struct Transaction {
     created_states: HashMap<String, StateCell>,
     created_derived: HashMap<String, DerivedCell>,
     created_model_owners: HashMap<String, String>,
+    created_model_types: HashMap<String, String>,
     updated_model_owners: HashMap<String, String>,
     deleted_states: HashSet<String>,
     deleted_derived: HashSet<String>,
@@ -198,6 +201,7 @@ pub struct Runtime {
     runtime_model_roots: HashMap<String, RuntimeModelRoot>,
     runtime_designations: HashMap<String, RuntimeDesignationMetadata>,
     dynamic_model_owners: HashMap<String, String>,
+    dynamic_model_types: HashMap<String, String>,
     runtime_index_grant_carriers: HashMap<String, Expr>,
     next_dynamic_identity: u64,
     transaction: Option<Transaction>,
@@ -222,6 +226,7 @@ impl Runtime {
             runtime_model_roots: HashMap::new(),
             runtime_designations: HashMap::new(),
             dynamic_model_owners: HashMap::new(),
+            dynamic_model_types: HashMap::new(),
             runtime_index_grant_carriers: HashMap::new(),
             next_dynamic_identity: 0,
             transaction: None,
@@ -439,6 +444,11 @@ impl Runtime {
             .expect("transaction should exist while creating model")
             .created_model_owners
             .insert(identity.clone(), owner_root.to_string());
+        self.transaction
+            .as_mut()
+            .expect("transaction should exist while creating model")
+            .created_model_types
+            .insert(identity.clone(), model_name.to_string());
 
         let context = ModelRuntimeContext {
             root: identity.clone(),
@@ -2880,6 +2890,7 @@ impl Runtime {
             created_states,
             created_derived,
             created_model_owners,
+            created_model_types,
             updated_model_owners,
             deleted_states,
             deleted_derived,
@@ -2890,6 +2901,7 @@ impl Runtime {
         self.states.extend(created_states);
         self.derived.extend(created_derived);
         self.dynamic_model_owners.extend(created_model_owners);
+        self.dynamic_model_types.extend(created_model_types);
         self.dynamic_model_owners.extend(updated_model_owners);
 
         let mut changed = Vec::new();
@@ -2923,6 +2935,7 @@ impl Runtime {
         }
         for identity in terminated_model_identities {
             self.dynamic_model_owners.remove(&identity);
+            self.dynamic_model_types.remove(&identity);
         }
     }
 

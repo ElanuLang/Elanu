@@ -33,7 +33,11 @@ action deleteSelected {
 
     assert_eq!(runtime.dynamic_model_types.len(), 1);
     assert_eq!(
-        runtime.dynamic_model_types.values().next().map(String::as_str),
+        runtime
+            .dynamic_model_types
+            .values()
+            .next()
+            .map(String::as_str),
         Some("Folder")
     );
 
