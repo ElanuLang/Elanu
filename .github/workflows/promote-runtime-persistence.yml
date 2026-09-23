@@ -1,0 +1,32 @@
+name: Promote runtime persistence
+
+on:
+  push:
+    branches:
+      - promote-runtime-persistence-api
+
+permissions:
+  contents: write
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: promote-runtime-persistence-api
+      - run: python .github/scripts/promote_runtime_persistence.py
+      - name: Format and test production persistence API
+        run: |
+          cd compiler
+          cargo fmt
+          cargo test runtime::persistence::tests:: -- --nocapture
+          cargo test runtime::restart_checkpoint_experiment:: -- --nocapture
+          cd ..
+      - name: Commit production promotion
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add compiler/src/runtime.rs compiler/src/runtime/persistence.rs
+          git commit -m "Promote runtime persistence API"
+          git push origin HEAD:promote-runtime-persistence-api
