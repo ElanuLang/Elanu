@@ -201,7 +201,7 @@ fn encode_shape(
 
 fn decode_shape(decoder: &mut PersistenceDecoder<'_>) -> Result<PersistenceShape, RuntimeError> {
     let static_count = decoder.len()?;
-    let mut static_states = Vec::with_capacity(static_count);
+    let mut static_states = Vec::new();
     for _ in 0..static_count {
         static_states.push(PersistenceStateShape {
             name: decoder.string()?,
@@ -211,7 +211,7 @@ fn decode_shape(decoder: &mut PersistenceDecoder<'_>) -> Result<PersistenceShape
     }
 
     let model_count = decoder.len()?;
-    let mut model_states = Vec::with_capacity(model_count);
+    let mut model_states = Vec::new();
     for _ in 0..model_count {
         model_states.push(PersistenceModelStateShape {
             model_name: decoder.string()?,
@@ -222,7 +222,7 @@ fn decode_shape(decoder: &mut PersistenceDecoder<'_>) -> Result<PersistenceShape
     }
 
     let root_count = decoder.len()?;
-    let mut roots = Vec::with_capacity(root_count);
+    let mut roots = Vec::new();
     for _ in 0..root_count {
         roots.push(PersistenceRootShape {
             root_name: decoder.string()?,
@@ -344,7 +344,7 @@ fn decode_value(decoder: &mut PersistenceDecoder<'_>) -> Result<Value, RuntimeEr
         4 => {
             let element_model = decoder.string()?;
             let count = decoder.len()?;
-            let mut targets = Vec::with_capacity(count);
+            let mut targets = Vec::new();
             for _ in 0..count {
                 targets.push(decoder.string()?);
             }
@@ -392,7 +392,7 @@ fn decode_state_values(
     decoder: &mut PersistenceDecoder<'_>,
 ) -> Result<HashMap<String, Value>, RuntimeError> {
     let count = decoder.len()?;
-    let mut values = HashMap::with_capacity(count);
+    let mut values = HashMap::new();
     for _ in 0..count {
         let name = decoder.string()?;
         let value = decode_value(decoder)?;
@@ -427,7 +427,7 @@ fn decode_dynamic_models(
     decoder: &mut PersistenceDecoder<'_>,
 ) -> Result<HashMap<String, PersistenceDynamicModel>, RuntimeError> {
     let count = decoder.len()?;
-    let mut models = HashMap::with_capacity(count);
+    let mut models = HashMap::new();
     for _ in 0..count {
         let identity = decoder.string()?;
         let model = PersistenceDynamicModel {
@@ -1038,6 +1038,18 @@ action failedRename {
             PersistenceImage::decode(&image.encode().unwrap()).unwrap(),
             image
         );
+    }
+
+    #[test]
+    fn forged_huge_collection_count_fails_without_preallocating_that_count() {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(PERSISTENCE_ENCODING_MAGIC);
+        bytes.extend_from_slice(&PERSISTENCE_ENCODING_VERSION.to_le_bytes());
+        bytes.extend_from_slice(&u32::MAX.to_le_bytes());
+
+        let error = PersistenceImage::decode(&bytes)
+            .expect_err("forged huge collection count must fail as truncated data");
+        assert!(error.message.contains("truncated"));
     }
 
     #[test]
