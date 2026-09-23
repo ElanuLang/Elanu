@@ -259,7 +259,9 @@ fn restore_image(
     let static_state_names = runtime.states.keys().cloned().collect::<Vec<_>>();
     for name in static_state_names {
         let value = image.state_values.get(&name).cloned().ok_or_else(|| {
-            RuntimeError::new(format!("persistence image is missing committed state '{name}'"))
+            RuntimeError::new(format!(
+                "persistence image is missing committed state '{name}'"
+            ))
         })?;
         let state = runtime
             .states
@@ -348,7 +350,9 @@ fn restore_image(
         {
             let name = model_binding_name(identity, &member.name);
             let value = image.state_values.get(&name).cloned().ok_or_else(|| {
-                RuntimeError::new(format!("persistence image is missing dynamic state '{name}'"))
+                RuntimeError::new(format!(
+                    "persistence image is missing dynamic state '{name}'"
+                ))
             })?;
             if runtime.states.contains_key(&name) {
                 return Err(RuntimeError::new(format!(
@@ -415,6 +419,7 @@ mod tests {
     const SOURCE: &str = r#"
 state model Folder {
     state name = ""
+    state folders: [live Folder] = []
 }
 
 state workspace: Folder

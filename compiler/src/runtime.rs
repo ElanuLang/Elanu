@@ -28,6 +28,7 @@ mod designation_metadata_execution;
 mod lifetime_termination_execution;
 #[cfg(test)]
 mod model_local_designation_experiment;
+pub mod persistence;
 #[cfg(test)]
 mod persistence_identity_metadata;
 #[cfg(test)]
