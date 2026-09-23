@@ -66,3 +66,14 @@ replace_once(
     "        for identity in terminated_model_identities {\n            self.dynamic_model_owners.remove(&identity);\n            self.dynamic_model_types.remove(&identity);\n        }\n",
     "remove terminated model type",
 )
+
+for fixture in [
+    Path("compiler/src/runtime/structural_move_execution.rs"),
+    Path("compiler/src/runtime/relative_navigation_execution.rs"),
+]:
+    replace_once(
+        fixture,
+        "        dynamic_model_owners: HashMap::new(),\n        runtime_index_grant_carriers: HashMap::new(),\n",
+        "        dynamic_model_owners: HashMap::new(),\n        dynamic_model_types: HashMap::new(),\n        runtime_index_grant_carriers: HashMap::new(),\n",
+        "Runtime fixture model type initialization",
+    )
