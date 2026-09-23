@@ -16,7 +16,9 @@ jobs:
         with:
           ref: structural-selection-materialization-pressure
       - name: Wire structural selection materialization
-        run: python .github/scripts/wire_structural_selection_materialization.py
+        run: |
+          python .github/scripts/wire_structural_selection_materialization.py
+          python .github/scripts/wire_structural_root_binding_metadata.py
       - name: Validate compiler
         working-directory: compiler
         run: |
@@ -30,7 +32,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add compiler/src/runtime/persistence/partial.rs docs/DEVELOPMENT.md CHANGELOG.md
+          git add compiler/src/model_lowering.rs compiler/src/lib.rs compiler/src/runtime/persistence/partial.rs docs/DEVELOPMENT.md CHANGELOG.md
           if ! git diff --cached --quiet; then
             git commit -m "Materialize partial backing through structural selection"
             git push origin HEAD:structural-selection-materialization-pressure
