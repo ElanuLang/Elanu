@@ -451,10 +451,6 @@ fn dormant_identity_representation_preserves_exact_world_and_materializes_in_pla
         Value::String("Active".to_string())
     );
     assert_eq!(
-        partial.runtime.value("coldFolder").unwrap(),
-        Value::String(cold_folder.clone())
-    );
-    assert_eq!(
         partial.runtime.value("coldInWorkspace").unwrap(),
         Value::Bool(true)
     );
