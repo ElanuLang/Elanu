@@ -1264,7 +1264,7 @@ fn split_member_path<'a>(
     Some((first, second))
 }
 
-fn model_binding_name(root: &str, member: &str) -> String {
+pub(crate) fn model_binding_name(root: &str, member: &str) -> String {
     format!("__meld_sm${root}${member}")
 }
 

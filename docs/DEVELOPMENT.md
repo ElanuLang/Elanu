@@ -141,6 +141,12 @@ current target and its private backing handle without parsing generated names or
 identity/backing keys to the host. This remains explicit host-driven materialization, not automatic
 loading on member access.
 
+`PartialPersistentRuntime::materialize_root_member_index` covers the bounded static-root structural
+navigation case: the host supplies a source modeled-root name, stored `[live T]` member name, and
+current numeric occurrence index. The runtime resolves the current exact child identity and private
+backing handle internally. The index remains a transient structural occurrence selector rather than
+persistent child identity, including when duplicate occurrences target the same modeled child.
+
 Backing keys, residency, manifest layout, and materialization are runtime/host infrastructure rather
 than Elanu source concepts. The boundary does not select automatic loading, eviction/cache policy,
 backing garbage collection, content addressing, a database/ORM/query API, or a concrete storage
