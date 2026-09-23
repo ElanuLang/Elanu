@@ -1856,6 +1856,7 @@ impl Runtime {
             return Err(RuntimeError::new(format!(
                 "action '{}' expects {} arguments but got {}",
                 action.name,
+                action.parameters.len(),
                 arguments.len()
             )));
         }
