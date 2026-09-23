@@ -398,6 +398,41 @@ optional designation form does not become dangling under that operation. Revisit
 when another lifetime-ending form cannot preserve that guarantee or when repeated non-live
 optional-state pressure earns a broader sum/option mechanism.
 
+## Model-local optional designation state belongs to the exact modeled identity
+
+Trash/restore composition established a persistent application fact that is neither structural membership nor an ordinary value: each runtime-created folder may need to remember zero or one exact previous parent identity across later actions.
+
+Decision:
+
+```elanu
+state model Folder {
+    state restoreParent: maybe live Folder = none
+}
+```
+
+- every concrete modeled identity owns its own declared optional designation slot, just as it owns its other model-local state;
+- the slot stores target identity or absence, not a key, structural position, or collection occurrence;
+- the designation remains non-owning and does not grant writable authority or lifetime authority;
+- assignment and clearing participate in the ordinary shared action transaction;
+- when the designated target's lifetime ends, the slot is cleared by the existing optional-designation cleanup law;
+- when the slot-owning modeled identity ends, the designation role ends with that state identity rather than surviving in global metadata;
+- the current surface does not expose the private bootstrap carrier as an ordinary value.
+
+Rationale:
+
+Encoding a singular optional relation as a zero-or-one `[live T]` sequence is behaviorally possible but semantically inaccurate: it introduces ordering, duplicate multiplicity, arbitrary cardinality, indexing, and manual clearing rules that do not belong to the application fact. A parallel business key/table would likewise reconstruct identity that Elanu already owns. Model-local `maybe live T` preserves the exact fact directly and composes with the established designation/lifetime laws.
+
+The runtime experiment showed that no second designation system is needed. Designation role is attached to the state cell whose lifetime it follows, allowing both top-level and model-local optional designation state to use the same transactional and lifetime-cleanup mechanism. That representation is implementation evidence, not source-language law.
+
+Boundaries:
+
+- only model-local `maybe live T` is selected by this pressure; model-local plain `live T` is not added by symmetry;
+- this does not select generalized `Option`, nullable ordinary values, designation equality, first-class references, ownership/borrowing, or writable-state grants to designation slots;
+- structural membership remains independent and non-owning;
+- broader designation flow should be earned by a separate composition need.
+
+Revisit when a realistic application requires a mandatory model-local designation, a non-live optional state mechanism, or designation flow that the current contextual surface cannot express without reconstruction.
+
 ## Root provenance governs explicit dynamic-child lifetime termination
 
 Decision:
