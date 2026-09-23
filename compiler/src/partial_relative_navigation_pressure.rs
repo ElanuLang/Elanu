@@ -18,6 +18,7 @@ state model Workspace {
 
 state workspace: Workspace
 state selectedFolder: maybe live Folder = none
+state otherFolder: maybe live Folder = none
 state selectedDocument: maybe live Document = none
 state thirdDocument: maybe live Document = none
 
@@ -28,6 +29,10 @@ action seed {
         insert folder into workspace.folders
     }
     selectedFolder = workspace.folders[0]
+    create Folder in workspace as other {
+        insert other into workspace.folders
+        otherFolder = other
+    }
     create Document in selectedFolder as first {
         through first.title = "First"
         insert first into selectedFolder.documents
@@ -56,6 +61,10 @@ action clearSelectedDocument {
     selectedDocument = none
 }
 
+action clearSelectedFolder {
+    selectedFolder = none
+}
+
 action duplicateSelectedOccurrence {
     insert selectedDocument into selectedFolder.documents
 }
@@ -66,6 +75,16 @@ action reorderSelectedToEnd {
 }
 
 action moveSelectedAfterThird {
+    move selectedDocument after thirdDocument in selectedFolder.documents
+}
+
+action moveSelectedAfterThirdThenFail {
+    move selectedDocument after thirdDocument in selectedFolder.documents
+    fail "reject moved order"
+}
+
+action reselectOtherFolderThenMove {
+    selectedFolder = otherFolder
     move selectedDocument after thirdDocument in selectedFolder.documents
 }
 "#;
@@ -256,5 +275,107 @@ fn designation_owned_move_reorders_resident_owner_without_loading_children() {
         provider.loads.len(),
         2,
         "move should need only owner backing; only later designation materialization reads one child"
+    );
+}
+
+#[test]
+fn designation_owned_move_absent_owner_fails_without_child_reads() {
+    let mut runtime = restarted();
+    runtime
+        .materialize_root_member_index("workspace", "folders", 0)
+        .expect("selected Folder should materialize");
+    runtime.run_action("clearSelectedFolder").unwrap();
+
+    runtime
+        .run_action("moveSelectedAfterThird")
+        .expect_err("absent designation owner should fail movement");
+
+    let provider = runtime.into_provider();
+    assert_eq!(
+        provider.loads.len(),
+        1,
+        "absent owner movement must not read dormant child backing"
+    );
+}
+
+#[test]
+fn designation_owned_move_duplicate_moving_occurrence_remains_ambiguous() {
+    let mut runtime = restarted();
+    runtime
+        .materialize_root_member_index("workspace", "folders", 0)
+        .expect("selected Folder should materialize");
+    runtime.run_action("duplicateSelectedOccurrence").unwrap();
+
+    runtime
+        .run_action("moveSelectedAfterThird")
+        .expect_err("duplicate moving occurrences should remain ambiguous");
+
+    let provider = runtime.into_provider();
+    assert_eq!(
+        provider.loads.len(),
+        1,
+        "movement ambiguity must be resolved from resident owner structure alone"
+    );
+}
+
+#[test]
+fn designation_owned_move_rolls_back_order_on_later_failure() {
+    let mut runtime = restarted();
+    runtime
+        .materialize_root_member_index("workspace", "folders", 0)
+        .expect("selected Folder should materialize");
+
+    runtime
+        .run_action("moveSelectedAfterThirdThenFail")
+        .expect_err("later failure should roll movement back");
+    runtime
+        .run_action("previousDocument")
+        .expect("original order should be restored after rollback");
+    runtime
+        .materialize_designation("selectedDocument")
+        .expect("restored previous Document should materialize");
+
+    assert_eq!(
+        runtime.value("selectedTitle").unwrap(),
+        Value::String("First".into())
+    );
+    let provider = runtime.into_provider();
+    assert_eq!(
+        provider.loads.len(),
+        2,
+        "rolled-back movement should not read dormant children"
+    );
+}
+
+#[test]
+fn designation_owned_move_observes_transaction_visible_owner_reselection() {
+    let mut runtime = restarted();
+    runtime
+        .materialize_root_member_index("workspace", "folders", 0)
+        .expect("selected Folder should materialize");
+    runtime
+        .materialize_root_member_index("workspace", "folders", 1)
+        .expect("other Folder should materialize");
+
+    runtime
+        .run_action("reselectOtherFolderThenMove")
+        .expect_err("movement should resolve the transaction-visible reselected empty owner");
+
+    runtime
+        .run_action("previousDocument")
+        .expect("failed action should roll selectedFolder back to the original owner");
+    runtime
+        .materialize_designation("selectedDocument")
+        .expect("previous Document on restored owner should materialize");
+
+    assert_eq!(
+        runtime.value("selectedTitle").unwrap(),
+        Value::String("First".into())
+    );
+    let provider = runtime.into_provider();
+    assert_eq!(
+        provider.loads.len(),
+        3,
+        "only both resident owners and the finally selected Document should be read"
     );
 }
