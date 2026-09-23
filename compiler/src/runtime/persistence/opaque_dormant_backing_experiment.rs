@@ -69,7 +69,10 @@ fn cold_subtree_identities(image: &PersistenceImage) -> HashSet<String> {
             if dynamic.model_name != "Folder" {
                 return None;
             }
-            match image.state_values.get(&model_binding_name(identity, "name")) {
+            match image
+                .state_values
+                .get(&model_binding_name(identity, "name"))
+            {
                 Some(Value::String(value)) if value == "Cold" => Some(identity.clone()),
                 _ => None,
             }
@@ -103,10 +106,8 @@ struct DormantHandle {
 
 trait OpaqueDormantBackingProvider {
     fn load_manifest(&mut self) -> Result<Vec<u8>, RuntimeError>;
-    fn load_backing(
-        &mut self,
-        token: DormantBackingToken,
-    ) -> Result<Option<Vec<u8>>, RuntimeError>;
+    fn load_backing(&mut self, token: DormantBackingToken)
+        -> Result<Option<Vec<u8>>, RuntimeError>;
 }
 
 #[derive(Debug, Clone)]
@@ -185,7 +186,9 @@ fn decode_manifest(
             token: DormantBackingToken(decoder.u64()?),
         };
         if !tokens.insert(handle.token) {
-            return Err(RuntimeError::new("dormant manifest repeats a backing token"));
+            return Err(RuntimeError::new(
+                "dormant manifest repeats a backing token",
+            ));
         }
         if dormant.insert(identity.clone(), handle).is_some() {
             return Err(RuntimeError::new(format!(
@@ -251,13 +254,19 @@ fn decode_backing(
     }
     let token = DormantBackingToken(decoder.u64()?);
     if token != handle.token {
-        return Err(RuntimeError::new("dormant backing token does not match request"));
+        return Err(RuntimeError::new(
+            "dormant backing token does not match request",
+        ));
     }
     if decoder.string()? != identity {
-        return Err(RuntimeError::new("dormant backing identity does not match request"));
+        return Err(RuntimeError::new(
+            "dormant backing identity does not match request",
+        ));
     }
     if decoder.string()? != handle.model_name {
-        return Err(RuntimeError::new("dormant backing model does not match known identity"));
+        return Err(RuntimeError::new(
+            "dormant backing model does not match known identity",
+        ));
     }
 
     let template = checked
@@ -299,9 +308,10 @@ fn split_world_into_opaque_backing(
     identities.sort();
 
     for (index, identity) in identities.into_iter().enumerate() {
-        let dynamic = image.dynamic_models.get(&identity).ok_or_else(|| {
-            RuntimeError::new(format!("unknown dormant identity '{identity}'"))
-        })?;
+        let dynamic = image
+            .dynamic_models
+            .get(&identity)
+            .ok_or_else(|| RuntimeError::new(format!("unknown dormant identity '{identity}'")))?;
         let token = DormantBackingToken(
             u64::try_from(index)
                 .map_err(|_| RuntimeError::new("too many dormant identities for experiment"))?,
@@ -365,7 +375,10 @@ impl<P: OpaqueDormantBackingProvider> OpaqueBackedRuntime<P> {
                     "dormant identity '{identity}' duplicates a resident identity"
                 )));
             }
-            if !checked.runtime_model_templates.contains_key(&handle.model_name) {
+            if !checked
+                .runtime_model_templates
+                .contains_key(&handle.model_name)
+            {
                 return Err(RuntimeError::new(format!(
                     "dormant identity '{identity}' references unknown model '{}'",
                     handle.model_name
@@ -398,15 +411,13 @@ impl<P: OpaqueDormantBackingProvider> OpaqueBackedRuntime<P> {
     }
 
     fn materialize(&mut self, identity: &str) -> Result<(), RuntimeError> {
-        let handle = self
-            .dormant
-            .get(identity)
-            .cloned()
-            .ok_or_else(|| RuntimeError::new(format!("identity '{identity}' is not dormant")))?;
-        let payload = self
-            .provider
-            .load_backing(handle.token)?
-            .ok_or_else(|| RuntimeError::new(format!("missing dormant backing for '{identity}'")))?;
+        let handle =
+            self.dormant.get(identity).cloned().ok_or_else(|| {
+                RuntimeError::new(format!("identity '{identity}' is not dormant"))
+            })?;
+        let payload = self.provider.load_backing(handle.token)?.ok_or_else(|| {
+            RuntimeError::new(format!("missing dormant backing for '{identity}'"))
+        })?;
         let values = decode_backing(&self.checked, identity, &handle, &payload)?;
 
         if self.runtime.dynamic_model_types.get(identity) != Some(&handle.model_name) {
@@ -486,10 +497,9 @@ impl<P: OpaqueDormantBackingProvider> OpaqueBackedRuntime<P> {
         let mut image = capture_image(&self.runtime, &self.shape)?;
         let dormant = self.dormant.clone();
         for (identity, handle) in dormant {
-            let payload = self
-                .provider
-                .load_backing(handle.token)?
-                .ok_or_else(|| RuntimeError::new(format!("missing dormant backing for '{identity}'")))?;
+            let payload = self.provider.load_backing(handle.token)?.ok_or_else(|| {
+                RuntimeError::new(format!("missing dormant backing for '{identity}'"))
+            })?;
             let values = decode_backing(&self.checked, &identity, &handle, &payload)?;
             for (member_name, value) in values {
                 let name = model_binding_name(&identity, &member_name);
@@ -535,7 +545,10 @@ fn opaque_host_backing_loads_only_the_explicitly_materialized_identity() {
         app.runtime.value("activeName").unwrap(),
         Value::String("Active".to_string())
     );
-    assert_eq!(app.runtime.value("coldInWorkspace").unwrap(), Value::Bool(true));
+    assert_eq!(
+        app.runtime.value("coldInWorkspace").unwrap(),
+        Value::Bool(true)
+    );
     app.runtime.run_action("renameActive").unwrap();
     assert!(
         app.provider.backing_loads.is_empty(),
@@ -639,7 +652,10 @@ fn process_restart_can_open_dormant_world_without_loading_member_backing() {
         restarted.runtime.value("activeName").unwrap(),
         Value::String("Active".to_string())
     );
-    assert_eq!(restarted.runtime.value("coldInWorkspace").unwrap(), Value::Bool(true));
+    assert_eq!(
+        restarted.runtime.value("coldInWorkspace").unwrap(),
+        Value::Bool(true)
+    );
     restarted
         .runtime
         .value("coldName")
