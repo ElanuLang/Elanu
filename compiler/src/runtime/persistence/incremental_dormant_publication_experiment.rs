@@ -423,12 +423,8 @@ impl<P: IncrementalPublicationProvider> IncrementalBackedRuntime<P> {
         };
 
         let candidate_next_dynamic_identity = self.runtime.next_dynamic_identity;
-        let mut candidate = restore_partial_runtime(
-            &self.checked,
-            &self.shape,
-            &prior_partial,
-            &self.dormant,
-        )?;
+        let mut candidate =
+            restore_partial_runtime(&self.checked, &self.shape, &prior_partial, &self.dormant)?;
         candidate.next_dynamic_identity = candidate_next_dynamic_identity;
         candidate.commit(transaction);
         let candidate_partial = capture_partial_image(&candidate, &self.shape, &self.dormant)?;
