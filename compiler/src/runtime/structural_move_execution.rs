@@ -73,6 +73,7 @@ fn runtime_with_structure(backing: &[&str], view: &[&str]) -> Runtime {
         runtime_model_roots: HashMap::new(),
         runtime_designations: HashMap::new(),
         dynamic_model_owners: HashMap::new(),
+        dynamic_model_types: HashMap::new(),
         runtime_index_grant_carriers: HashMap::new(),
         next_dynamic_identity: 0,
         transaction: None,
