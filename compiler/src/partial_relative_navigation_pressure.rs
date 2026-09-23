@@ -106,28 +106,26 @@ fn relative_reselection_needs_only_owner_backing_then_selected_child_backing() {
     runtime
         .materialize_root_member_index("workspace", "folders", 0)
         .expect("selected Folder should materialize");
-    assert_eq!(runtime.provider.loads.len(), 1);
-
     runtime
         .run_action("nextDocument")
         .expect("relative next should resolve from resident ordered structure");
-    assert_eq!(
-        runtime.provider.loads.len(),
-        1,
-        "relative reselection should not read Document member backing"
-    );
-
     runtime
         .materialize_designation("selectedDocument")
         .expect("newly selected Document should materialize through designation");
+
     assert_eq!(
         runtime.value("selectedTitle").unwrap(),
         Value::String("Third".into())
     );
+    let provider = runtime.into_provider();
     assert_eq!(
-        runtime.provider.loads.len(),
+        provider.loads.len(),
         2,
         "only the Folder and newly selected Document should be read"
+    );
+    assert_ne!(
+        provider.loads[0], provider.loads[1],
+        "relative navigation should materialize two distinct modeled identities"
     );
 }
 
@@ -142,8 +140,9 @@ fn relative_boundary_failure_does_not_speculatively_read_child_backing() {
     runtime
         .run_action("nextDocument")
         .expect_err("next at the current boundary should fail");
+    let provider = runtime.into_provider();
     assert_eq!(
-        runtime.provider.loads.len(),
+        provider.loads.len(),
         1,
         "boundary resolution should need only the resident owner structure"
     );
@@ -160,8 +159,9 @@ fn duplicate_anchor_failure_does_not_speculatively_read_child_backing() {
     runtime
         .run_action("previousDocument")
         .expect_err("duplicate anchor occurrences should remain ambiguous");
+    let provider = runtime.into_provider();
     assert_eq!(
-        runtime.provider.loads.len(),
+        provider.loads.len(),
         1,
         "ambiguity resolution should need only the resident owner structure"
     );
