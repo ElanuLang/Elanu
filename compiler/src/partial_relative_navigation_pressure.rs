@@ -19,6 +19,7 @@ state model Workspace {
 state workspace: Workspace
 state selectedFolder: maybe live Folder = none
 state selectedDocument: maybe live Document = none
+state thirdDocument: maybe live Document = none
 
 derived selectedTitle = selectedDocument.title
 
@@ -40,6 +41,7 @@ action seed {
         insert third into selectedFolder.documents
     }
     selectedDocument = selectedFolder.documents[1]
+    thirdDocument = selectedFolder.documents[2]
 }
 
 action nextDocument {
@@ -61,6 +63,10 @@ action duplicateSelectedOccurrence {
 action reorderSelectedToEnd {
     remove selectedDocument from selectedFolder.documents
     insert selectedDocument into selectedFolder.documents
+}
+
+action moveSelectedAfterThird {
+    move selectedDocument after thirdDocument in selectedFolder.documents
 }
 "#;
 
@@ -221,5 +227,34 @@ fn relative_navigation_uses_current_reordered_structure_without_child_reads() {
         provider.loads.len(),
         2,
         "reordering and relative selection should not read dormant sibling backing"
+    );
+}
+
+#[test]
+fn designation_owned_move_reorders_resident_owner_without_loading_children() {
+    let mut runtime = restarted();
+    runtime
+        .materialize_root_member_index("workspace", "folders", 0)
+        .expect("selected Folder should materialize");
+
+    runtime
+        .run_action("moveSelectedAfterThird")
+        .expect("move should resolve the exact designation-owned documents membership");
+    runtime
+        .run_action("previousDocument")
+        .expect("relative navigation should observe the moved current structure");
+    runtime
+        .materialize_designation("selectedDocument")
+        .expect("newly selected previous Document should materialize");
+
+    assert_eq!(
+        runtime.value("selectedTitle").unwrap(),
+        Value::String("Third".into())
+    );
+    let provider = runtime.into_provider();
+    assert_eq!(
+        provider.loads.len(),
+        2,
+        "move should need only owner backing; only later designation materialization reads one child"
     );
 }
