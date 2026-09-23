@@ -1,0 +1,34 @@
+name: Restart checkpoint experiment
+
+on:
+  push:
+    branches:
+      - restart-checkpoint-experiment
+
+permissions:
+  contents: write
+
+jobs:
+  experiment:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: restart-checkpoint-experiment
+      - run: python .github/scripts/register_restart_checkpoint_experiment.py
+      - name: Format and run focused restart tests
+        run: |
+          cd compiler
+          cargo fmt
+          cargo test runtime::restart_checkpoint_experiment -- --nocapture
+          cargo test runtime::persistence_identity_metadata -- --nocapture
+          cargo test runtime::provenance_transfer_execution -- --nocapture
+          cargo test runtime::lifetime_termination_execution -- --nocapture
+          cd ..
+      - name: Commit runtime-only experiment
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add compiler/src/runtime.rs compiler/src/runtime/restart_checkpoint_experiment.rs
+          git commit -m "Prove committed runtime restart checkpoint"
+          git push origin HEAD:restart-checkpoint-experiment
