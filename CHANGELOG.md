@@ -38,6 +38,7 @@
 
 ### Compiler/runtime
 
+- Added host-driven partial-persistence materialization by top-level source live designation, preserving the source-to-lowered runtime binding structurally so hosts need not see dynamic identities or backing keys.
 - Added production partial-residency persistence with opaque per-identity backing, explicit runtime materialization, and atomic candidate publication that rewrites only changed backing while preserving existing monolithic `PersistentRuntime` behavior.
 - Added runtime-owned deterministic opaque persistence image encoding/decoding with explicit format versioning and validation, allowing providers to store uninterpreted bytes across process restart without exposing image internals or selecting a storage backend.
 - Promoted the proven restart image, persisted-shape compatibility check, provider `load`/atomic-`replace` boundary, and candidate-before-publication ordering into the public synchronous `runtime::persistence` host API without adding source persistence syntax or choosing a storage backend.

@@ -85,6 +85,53 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
         keys
     }
 
+    /// Materialize the exact modeled identity currently carried by one
+    /// top-level source designation. The host names application state, while
+    /// dynamic identity and backing-key correlation remain runtime-private.
+    pub fn materialize_designation(&mut self, designation: &str) -> Result<(), RuntimeError> {
+        let lowered = self
+            .checked
+            .runtime_designation_bindings
+            .get(designation)
+            .cloned()
+            .ok_or_else(|| {
+                RuntimeError::new(format!(
+                    "unknown top-level live designation '{designation}'"
+                ))
+            })?;
+        let identity = match self
+            .runtime
+            .states
+            .get(&lowered)
+            .map(|cell| cell.value.clone())
+        {
+            Some(Value::String(identity)) if !identity.is_empty() => identity,
+            Some(Value::String(_)) => {
+                return Err(RuntimeError::new(format!(
+                    "live designation '{designation}' has no target"
+                )))
+            }
+            Some(other) => {
+                let type_name = other.type_name();
+                return Err(RuntimeError::new(format!(
+                    "internal live designation '{designation}' carried {type_name}, expected String identity"
+                )));
+            }
+            None => {
+                return Err(RuntimeError::new(format!(
+                    "runtime binding for live designation '{designation}' is missing"
+                )))
+            }
+        };
+        let handle = self.backed.get(&identity).ok_or_else(|| {
+            RuntimeError::new(format!(
+                "live designation '{designation}' targets an identity without partial-persistence backing"
+            ))
+        })?;
+        let key = encode_key(handle.token);
+        self.materialize(&key)
+    }
+
     /// Explicitly materialize one exact backed identity identified only by its
     /// opaque runtime key. Repeated materialization of an already resident
     /// identity is a no-op.
@@ -819,6 +866,41 @@ action failedRenameCold {
             Value::String("audited".into())
         );
         assert!(restarted.provider.loads.is_empty());
+    }
+
+    #[test]
+    fn source_designation_materializes_exact_selected_dormant_identity() {
+        let (checked, mut provider) = seeded_provider();
+        provider.loads.clear();
+        let mut runtime = PartialPersistentRuntime::open(checked, provider).unwrap();
+        let (folder_key, document_key) = keys_by_model(&runtime);
+
+        runtime.materialize_designation("coldFolder").unwrap();
+        assert_eq!(runtime.provider.loads, vec![folder_key]);
+        assert!(!runtime.provider.loads.contains(&document_key));
+        assert_eq!(
+            runtime.value("coldName").unwrap(),
+            Value::String("Cold".into())
+        );
+    }
+
+    #[test]
+    fn designation_materialization_failure_does_not_partially_install_members() {
+        let (checked, mut provider) = seeded_provider();
+        provider.loads.clear();
+        let (folder_key, _) = {
+            let runtime =
+                PartialPersistentRuntime::open(checked.clone(), provider.clone()).unwrap();
+            keys_by_model(&runtime)
+        };
+        provider.backing.remove(&folder_key);
+        let mut runtime = PartialPersistentRuntime::open(checked, provider).unwrap();
+
+        runtime
+            .materialize_designation("coldFolder")
+            .expect_err("missing backing should reject selected materialization");
+        assert!(runtime.value("coldName").is_err());
+        assert_eq!(runtime.provider.loads, vec![folder_key]);
     }
 
     #[test]
