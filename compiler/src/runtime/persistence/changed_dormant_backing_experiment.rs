@@ -149,7 +149,9 @@ impl ChangedBackingProvider for ChangedBackingMemoryProvider {
         self.candidate_replace_attempts += 1;
         if self.reject_next_candidate {
             self.reject_next_candidate = false;
-            return Err(RuntimeError::new("provider rejected changed-backing candidate"));
+            return Err(RuntimeError::new(
+                "provider rejected changed-backing candidate",
+            ));
         }
 
         let mut next_backing = self.backing.clone();
@@ -316,12 +318,16 @@ fn backing_values_from_runtime(
     let mut values = HashMap::new();
     for member in stored_members(checked, handle)? {
         let name = model_binding_name(identity, &member.name);
-        let value = runtime.states.get(&name).map(|cell| cell.value.clone()).ok_or_else(|| {
-            RuntimeError::new(format!(
-                "resident backed identity '{identity}' is missing state '{}'",
-                member.name
-            ))
-        })?;
+        let value = runtime
+            .states
+            .get(&name)
+            .map(|cell| cell.value.clone())
+            .ok_or_else(|| {
+                RuntimeError::new(format!(
+                    "resident backed identity '{identity}' is missing state '{}'",
+                    member.name
+                ))
+            })?;
         values.insert(member.name.clone(), value);
     }
     Ok(values)
@@ -482,7 +488,10 @@ fn restore_partial_runtime(
                 "backed identity '{identity}' duplicates a resident identity"
             )));
         }
-        if !checked.runtime_model_templates.contains_key(&handle.model_name) {
+        if !checked
+            .runtime_model_templates
+            .contains_key(&handle.model_name)
+        {
             return Err(RuntimeError::new(format!(
                 "backed identity '{identity}' references unknown model '{}'",
                 handle.model_name
@@ -553,15 +562,12 @@ fn install_backed_values(
             RuntimeModelMemberKind::State => states.push((
                 name,
                 StateCell {
-                    value: values
-                        .get(&member.name)
-                        .cloned()
-                        .ok_or_else(|| {
-                            RuntimeError::new(format!(
-                                "validated backing is missing '{identity}.{}'",
-                                member.name
-                            ))
-                        })?,
+                    value: values.get(&member.name).cloned().ok_or_else(|| {
+                        RuntimeError::new(format!(
+                            "validated backing is missing '{identity}.{}'",
+                            member.name
+                        ))
+                    })?,
                     value_type: member.value_type.clone(),
                     designation: member.designation.clone(),
                     dependents: HashSet::new(),
@@ -663,12 +669,8 @@ impl<P: ChangedBackingProvider> ChangedBackingRuntime<P> {
         }
 
         let prior_next_dynamic_identity = self.runtime.next_dynamic_identity;
-        let prior_partial = capture_partial_image(
-            &self.checked,
-            &self.runtime,
-            &self.shape,
-            &self.backed,
-        )?;
+        let prior_partial =
+            capture_partial_image(&self.checked, &self.runtime, &self.shape, &self.backed)?;
         let prior_materialized = capture_materialized_values(
             &self.checked,
             &self.runtime,
@@ -707,12 +709,8 @@ impl<P: ChangedBackingProvider> ChangedBackingRuntime<P> {
         candidate.next_dynamic_identity = candidate_next_dynamic_identity;
         candidate.commit(transaction);
 
-        let candidate_partial = capture_partial_image(
-            &self.checked,
-            &candidate,
-            &self.shape,
-            &self.backed,
-        )?;
+        let candidate_partial =
+            capture_partial_image(&self.checked, &candidate, &self.shape, &self.backed)?;
         let candidate_manifest = encode_manifest(&candidate_partial, &self.backed)?;
 
         let mut replacements = Vec::new();
@@ -775,10 +773,7 @@ fn seeded_store() -> (
     (checked, image, cold, provider)
 }
 
-fn cold_identities(
-    image: &PersistenceImage,
-    cold: &HashSet<String>,
-) -> (String, String) {
+fn cold_identities(image: &PersistenceImage, cold: &HashSet<String>) -> (String, String) {
     let folder = cold
         .iter()
         .find(|identity| image.dynamic_models[*identity].model_name == "Folder")
@@ -816,7 +811,10 @@ fn changed_materialized_folder_replaces_only_its_opaque_backing() {
 
     let mut app = ChangedBackingRuntime::open(checked.clone(), provider).unwrap();
     assert!(app.provider.backing_loads.is_empty());
-    assert_eq!(app.value("audit").unwrap(), Value::String("idle".to_string()));
+    assert_eq!(
+        app.value("audit").unwrap(),
+        Value::String("idle".to_string())
+    );
     assert_eq!(app.value("coldInWorkspace").unwrap(), Value::Bool(true));
 
     app.materialize(&cold_folder)
@@ -845,13 +843,17 @@ fn changed_materialized_folder_replaces_only_its_opaque_backing() {
     assert_eq!(app.provider.accepted_replacement_tokens, vec![folder_token]);
     assert_ne!(app.provider.manifest, manifest_before);
     assert_ne!(app.provider.backing[&folder_token], folder_backing_before);
-    assert_eq!(app.provider.backing[&document_token], document_backing_before);
+    assert_eq!(
+        app.provider.backing[&document_token],
+        document_backing_before
+    );
     assert_eq!(app.provider.backing_loads, vec![folder_token]);
     assert_eq!(app.runtime.dynamic_model_types, original_types);
     assert_eq!(app.runtime.dynamic_model_owners, original_owners);
     assert_eq!(app.runtime.next_dynamic_identity, allocator);
 
-    let provider = app.into_provider();
+    let mut provider = app.into_provider();
+    provider.backing_loads.clear();
     let accepted_folder_backing = provider.backing[&folder_token].clone();
     let mut restarted = ChangedBackingRuntime::open(checked, provider).unwrap();
     assert!(restarted.provider.backing_loads.is_empty());
@@ -870,8 +872,14 @@ fn changed_materialized_folder_replaces_only_its_opaque_backing() {
         restarted.value("coldName").unwrap(),
         Value::String("Cold renamed".to_string())
     );
-    assert_eq!(restarted.provider.backing[&folder_token], accepted_folder_backing);
-    assert_eq!(restarted.provider.backing[&document_token], document_backing_before);
+    assert_eq!(
+        restarted.provider.backing[&folder_token],
+        accepted_folder_backing
+    );
+    assert_eq!(
+        restarted.provider.backing[&document_token],
+        document_backing_before
+    );
     restarted
         .value("coldDocumentTitle")
         .expect_err("Document should remain independently dormant after restart");
@@ -901,24 +909,40 @@ fn provider_rejection_preserves_manifest_all_backing_and_authoritative_runtime()
     assert!(app.provider.accepted_replacement_tokens.is_empty());
     assert_eq!(app.provider.manifest, manifest_before);
     assert_eq!(app.provider.backing, backing_before);
-    assert_eq!(app.provider.backing[&document_token], backing_before[&document_token]);
+    assert_eq!(
+        app.provider.backing[&document_token],
+        backing_before[&document_token]
+    );
     assert_eq!(
         app.value("coldName").unwrap(),
         Value::String("Cold".to_string())
     );
-    assert_eq!(app.value("audit").unwrap(), Value::String("idle".to_string()));
+    assert_eq!(
+        app.value("audit").unwrap(),
+        Value::String("idle".to_string())
+    );
 
     let provider = app.into_provider();
     let mut restarted = ChangedBackingRuntime::open(checked, provider).unwrap();
-    assert!(restarted.provider.backing_loads.iter().all(|token| *token == folder_token));
+    assert!(restarted
+        .provider
+        .backing_loads
+        .iter()
+        .all(|token| *token == folder_token));
     restarted.provider.backing_loads.clear();
-    assert_eq!(restarted.value("audit").unwrap(), Value::String("idle".to_string()));
+    assert_eq!(
+        restarted.value("audit").unwrap(),
+        Value::String("idle".to_string())
+    );
     restarted.materialize(&cold_folder).unwrap();
     assert_eq!(
         restarted.value("coldName").unwrap(),
         Value::String("Cold".to_string())
     );
-    assert_eq!(restarted.provider.backing[&document_token], backing_before[&document_token]);
+    assert_eq!(
+        restarted.provider.backing[&document_token],
+        backing_before[&document_token]
+    );
 }
 
 #[test]
@@ -946,5 +970,8 @@ fn semantic_failure_does_not_attempt_changed_backing_publication() {
         app.value("coldName").unwrap(),
         Value::String("Cold".to_string())
     );
-    assert_eq!(app.value("audit").unwrap(), Value::String("idle".to_string()));
+    assert_eq!(
+        app.value("audit").unwrap(),
+        Value::String("idle".to_string())
+    );
 }

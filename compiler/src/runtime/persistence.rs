@@ -828,6 +828,9 @@ fn restore_image(
 }
 
 #[cfg(test)]
+mod changed_dormant_backing_experiment;
+
+#[cfg(test)]
 mod incremental_dormant_publication_experiment;
 
 #[cfg(test)]
