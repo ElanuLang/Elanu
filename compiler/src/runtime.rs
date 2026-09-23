@@ -33,6 +33,8 @@ mod persistence_identity_metadata;
 #[cfg(test)]
 mod provenance_transfer_execution;
 #[cfg(test)]
+mod restart_checkpoint_experiment;
+#[cfg(test)]
 mod structural_move_execution;
 
 #[derive(Debug, Clone, PartialEq)]
