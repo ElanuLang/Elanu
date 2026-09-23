@@ -1,0 +1,34 @@
+name: Finalize runtime persistence
+
+on:
+  push:
+    branches:
+      - promote-runtime-persistence-api
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: promote-runtime-persistence-api
+      - run: python .github/scripts/finalize_runtime_persistence.py
+      - name: Validate promoted persistence API
+        run: |
+          cd compiler
+          cargo fmt
+          cargo fmt --check
+          cargo clippy -- -D warnings
+          cargo test runtime::persistence::tests:: -- --nocapture
+          cargo build
+          cd ..
+      - name: Commit final promotion changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add compiler/src/runtime.rs docs/DEVELOPMENT.md CHANGELOG.md
+          git commit -m "Document runtime persistence host API"
+          git push origin HEAD:promote-runtime-persistence-api
