@@ -57,6 +57,7 @@ pub struct CheckedSource {
     pub program: CheckedProgram,
     pub runtime_model_templates: HashMap<String, RuntimeModelTemplate>,
     pub runtime_model_roots: HashMap<String, RuntimeModelRoot>,
+    pub(crate) runtime_model_root_member_bindings: HashMap<String, HashMap<String, String>>,
     pub(crate) runtime_designations: HashMap<String, RuntimeDesignationMetadata>,
     pub(crate) runtime_designation_bindings: HashMap<String, String>,
 }
@@ -129,6 +130,38 @@ pub fn check_source_with_runtime_models(source: &str) -> Result<CheckedSource, V
         program: model_sequence_lowered,
         externalized_sequences,
     } = model_sequence_integration::lower(&filter_prepared)?;
+    let externalized_root_member_bindings = externalized_sequences
+        .iter()
+        .map(|(binding, sequence)| {
+            (
+                (sequence.owner_root.clone(), sequence.member_name.clone()),
+                binding.clone(),
+            )
+        })
+        .collect::<HashMap<_, _>>();
+    let runtime_model_root_member_bindings = runtime_model_roots
+        .iter()
+        .filter_map(|(root_name, root)| {
+            let template = runtime_model_templates.get(&root.model_name)?;
+            let bindings = template
+                .members
+                .iter()
+                .filter(|member| {
+                    member.kind == runtime_model_templates::RuntimeModelMemberKind::State
+                })
+                .map(|member| {
+                    let binding = externalized_root_member_bindings
+                        .get(&(root_name.clone(), member.name.clone()))
+                        .cloned()
+                        .unwrap_or_else(|| {
+                            model_lowering::model_binding_name(root_name, &member.name)
+                        });
+                    (member.name.clone(), binding)
+                })
+                .collect::<HashMap<_, _>>();
+            Some((root_name.clone(), bindings))
+        })
+        .collect::<HashMap<_, _>>();
     let runtime_index_grants =
         runtime_index_grant_transport::lower(&model_sequence_lowered, &runtime_model_templates)?;
     let sequence_lowered = sequence_lowering::lower(
@@ -178,6 +211,7 @@ pub fn check_source_with_runtime_models(source: &str) -> Result<CheckedSource, V
         program: checked,
         runtime_model_templates,
         runtime_model_roots,
+        runtime_model_root_member_bindings,
         runtime_designations,
         runtime_designation_bindings,
     })
