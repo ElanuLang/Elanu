@@ -19,7 +19,6 @@ state model Workspace {
 state workspace: Workspace
 state selectedFolder: maybe live Folder = none
 state selectedDocument: maybe live Document = none
-state thirdDocument: maybe live Document = none
 
 derived selectedTitle = selectedDocument.title
 
@@ -41,7 +40,6 @@ action seed {
         insert third into selectedFolder.documents
     }
     selectedDocument = selectedFolder.documents[1]
-    thirdDocument = selectedFolder.documents[2]
 }
 
 action nextDocument {
@@ -60,8 +58,9 @@ action duplicateSelectedOccurrence {
     insert selectedDocument into selectedFolder.documents
 }
 
-action moveSelectedAfterThird {
-    move selectedDocument after thirdDocument in selectedFolder.documents
+action reorderSelectedToEnd {
+    remove selectedDocument from selectedFolder.documents
+    insert selectedDocument into selectedFolder.documents
 }
 "#;
 
@@ -204,8 +203,8 @@ fn relative_navigation_uses_current_reordered_structure_without_child_reads() {
         .materialize_root_member_index("workspace", "folders", 0)
         .unwrap();
     runtime
-        .run_action("moveSelectedAfterThird")
-        .expect("structural movement should commit using resident Folder structure");
+        .run_action("reorderSelectedToEnd")
+        .expect("structural remove-plus-insert should reorder resident Folder structure");
     runtime
         .run_action("previousDocument")
         .expect("relative navigation should use the reordered current structure");
