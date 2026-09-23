@@ -110,7 +110,13 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
             .load_backing(key)?
             .ok_or_else(|| RuntimeError::new("missing partial-persistence backing payload"))?;
         let values = decode_backing(&self.checked, &identity, &handle, &payload)?;
-        install_member_values(&self.checked, &mut self.runtime, &identity, &handle, &values)?;
+        install_member_values(
+            &self.checked,
+            &mut self.runtime,
+            &identity,
+            &handle,
+            &values,
+        )?;
         self.backed
             .get_mut(&identity)
             .expect("materialized identity should remain backed")
@@ -126,12 +132,8 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
         }
 
         let prior_next_dynamic_identity = self.runtime.next_dynamic_identity;
-        let prior_partial = capture_partial_image(
-            &self.checked,
-            &self.runtime,
-            &self.shape,
-            &self.backed,
-        )?;
+        let prior_partial =
+            capture_partial_image(&self.checked, &self.runtime, &self.shape, &self.backed)?;
         let prior_backed = self.backed.clone();
         let prior_next_backing_token = self.next_backing_token;
 
@@ -151,12 +153,8 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
         };
 
         let candidate_next_dynamic_identity = self.runtime.next_dynamic_identity;
-        let mut candidate = restore_candidate_runtime(
-            &self.checked,
-            &self.shape,
-            &prior_partial,
-            &prior_backed,
-        )?;
+        let mut candidate =
+            restore_candidate_runtime(&self.checked, &self.shape, &prior_partial, &prior_backed)?;
         candidate.next_dynamic_identity = candidate_next_dynamic_identity;
         candidate.commit(transaction);
 
@@ -168,12 +166,8 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
             &mut candidate_next_backing_token,
         )?;
 
-        let candidate_partial = capture_partial_image(
-            &self.checked,
-            &candidate,
-            &self.shape,
-            &candidate_backed,
-        )?;
+        let candidate_partial =
+            capture_partial_image(&self.checked, &candidate, &self.shape, &candidate_backed)?;
         let mut replacements = Vec::new();
         let mut identities = candidate_backed.keys().cloned().collect::<Vec<_>>();
         identities.sort();
@@ -273,7 +267,9 @@ fn decode_manifest(
 ) -> Result<(PersistenceImage, HashMap<String, BackingHandle>, u64), RuntimeError> {
     let mut decoder = PersistenceDecoder::new(bytes);
     if decoder.raw(MANIFEST_MAGIC.len())? != MANIFEST_MAGIC {
-        return Err(RuntimeError::new("invalid partial-persistence manifest magic"));
+        return Err(RuntimeError::new(
+            "invalid partial-persistence manifest magic",
+        ));
     }
     let version = decoder.u32()?;
     if version != FORMAT_VERSION {
@@ -405,7 +401,9 @@ fn decode_backing(
 ) -> Result<HashMap<String, Value>, RuntimeError> {
     let mut decoder = PersistenceDecoder::new(bytes);
     if decoder.raw(BACKING_MAGIC.len())? != BACKING_MAGIC {
-        return Err(RuntimeError::new("invalid partial-persistence backing magic"));
+        return Err(RuntimeError::new(
+            "invalid partial-persistence backing magic",
+        ));
     }
     let version = decoder.u32()?;
     if version != FORMAT_VERSION {
@@ -483,7 +481,10 @@ fn install_backed_metadata(
                 "backed identity '{identity}' duplicates a resident identity"
             )));
         }
-        if !checked.runtime_model_templates.contains_key(&handle.model_name) {
+        if !checked
+            .runtime_model_templates
+            .contains_key(&handle.model_name)
+        {
             return Err(RuntimeError::new(format!(
                 "backed identity '{identity}' references unknown model '{}'",
                 handle.model_name
@@ -610,7 +611,11 @@ fn synchronize_backing_handles(
 ) -> Result<(), RuntimeError> {
     backed.retain(|identity, _| runtime.dynamic_model_types.contains_key(identity));
 
-    let mut identities = runtime.dynamic_model_types.keys().cloned().collect::<Vec<_>>();
+    let mut identities = runtime
+        .dynamic_model_types
+        .keys()
+        .cloned()
+        .collect::<Vec<_>>();
     identities.sort();
     for identity in identities {
         let model_name = runtime
@@ -630,9 +635,9 @@ fn synchronize_backing_handles(
             handle.owner = owner;
         } else {
             let token = *next_backing_token;
-            *next_backing_token = next_backing_token
-                .checked_add(1)
-                .ok_or_else(|| RuntimeError::new("partial-persistence backing key space exhausted"))?;
+            *next_backing_token = next_backing_token.checked_add(1).ok_or_else(|| {
+                RuntimeError::new("partial-persistence backing key space exhausted")
+            })?;
             backed.insert(
                 identity,
                 BackingHandle {
@@ -749,13 +754,15 @@ action failedRenameCold {
     }
 
     fn checked() -> CheckedSource {
-        crate::check_source_with_runtime_models(SOURCE).expect("partial persistence source should check")
+        crate::check_source_with_runtime_models(SOURCE)
+            .expect("partial persistence source should check")
     }
 
     fn seeded_provider() -> (CheckedSource, MemoryProvider) {
         let checked = checked();
-        let mut runtime = PartialPersistentRuntime::open(checked.clone(), MemoryProvider::default())
-            .expect("fresh partial runtime should open");
+        let mut runtime =
+            PartialPersistentRuntime::open(checked.clone(), MemoryProvider::default())
+                .expect("fresh partial runtime should open");
         runtime.run_action("seed").expect("seed should publish");
         (checked, runtime.into_provider())
     }
@@ -764,11 +771,17 @@ action failedRenameCold {
         let folder = runtime
             .backed
             .iter()
-            .find_map(|(_, handle)| {
-                (handle.model_name == "Folder" && handle.owner == "workspace")
-                    .then(|| encode_key(handle.token))
+            .find_map(|(identity, handle)| {
+                if handle.model_name != "Folder" {
+                    return None;
+                }
+                let key = encode_key(handle.token);
+                let payload = runtime.provider.backing.get(&key)?;
+                let values = decode_backing(&runtime.checked, identity, handle, payload).ok()?;
+                matches!(values.get("name"), Some(Value::String(name)) if name == "Cold")
+                    .then_some(key)
             })
-            .expect("Cold/Active Folder backing should exist");
+            .expect("Cold Folder backing should exist");
         let document = runtime
             .backed
             .iter()
@@ -790,7 +803,10 @@ action failedRenameCold {
         assert!(runtime.provider.loads.is_empty());
         assert!(!runtime.dormant_backing_keys().is_empty());
         runtime.run_action("auditOnly").unwrap();
-        assert_eq!(runtime.value("audit").unwrap(), Value::String("audited".into()));
+        assert_eq!(
+            runtime.value("audit").unwrap(),
+            Value::String("audited".into())
+        );
         assert!(runtime.provider.loads.is_empty());
         assert_eq!(runtime.provider.backing, backing_before);
         assert_eq!(runtime.provider.replacements, vec![Vec::<Vec<u8>>::new()]);
@@ -798,7 +814,10 @@ action failedRenameCold {
         let mut provider = runtime.into_provider();
         provider.loads.clear();
         let mut restarted = PartialPersistentRuntime::open(checked, provider).unwrap();
-        assert_eq!(restarted.value("audit").unwrap(), Value::String("audited".into()));
+        assert_eq!(
+            restarted.value("audit").unwrap(),
+            Value::String("audited".into())
+        );
         assert!(restarted.provider.loads.is_empty());
     }
 
@@ -814,10 +833,19 @@ action failedRenameCold {
         runtime.materialize(&folder_key).unwrap();
         assert_eq!(runtime.provider.loads, vec![folder_key.clone()]);
         runtime.run_action("renameCold").unwrap();
-        assert_eq!(runtime.value("audit").unwrap(), Value::String("renamed cold".into()));
-        assert_eq!(runtime.value("coldName").unwrap(), Value::String("Cold renamed".into()));
+        assert_eq!(
+            runtime.value("audit").unwrap(),
+            Value::String("renamed cold".into())
+        );
+        assert_eq!(
+            runtime.value("coldName").unwrap(),
+            Value::String("Cold renamed".into())
+        );
         assert_eq!(runtime.provider.loads, vec![folder_key.clone()]);
-        assert_eq!(runtime.provider.replacements.last().unwrap(), &vec![folder_key.clone()]);
+        assert_eq!(
+            runtime.provider.replacements.last().unwrap(),
+            &vec![folder_key.clone()]
+        );
         assert_eq!(runtime.provider.backing[&document_key], document_before);
 
         let mut provider = runtime.into_provider();
@@ -826,7 +854,10 @@ action failedRenameCold {
         assert!(restarted.provider.loads.is_empty());
         restarted.materialize(&folder_key).unwrap();
         assert_eq!(restarted.provider.loads, vec![folder_key]);
-        assert_eq!(restarted.value("coldName").unwrap(), Value::String("Cold renamed".into()));
+        assert_eq!(
+            restarted.value("coldName").unwrap(),
+            Value::String("Cold renamed".into())
+        );
         assert_eq!(restarted.provider.backing[&document_key], document_before);
     }
 
@@ -842,16 +873,32 @@ action failedRenameCold {
         let backing_before = runtime.provider.backing.clone();
         runtime.provider.reject_next = true;
 
-        runtime.run_action("renameCold").expect_err("provider rejection should reject action");
+        runtime
+            .run_action("renameCold")
+            .expect_err("provider rejection should reject action");
         assert_eq!(runtime.provider.manifest, manifest_before);
         assert_eq!(runtime.provider.backing, backing_before);
-        assert_eq!(runtime.value("audit").unwrap(), Value::String("idle".into()));
-        assert_eq!(runtime.value("coldName").unwrap(), Value::String("Cold".into()));
+        assert_eq!(
+            runtime.value("audit").unwrap(),
+            Value::String("idle".into())
+        );
+        assert_eq!(
+            runtime.value("coldName").unwrap(),
+            Value::String("Cold".into())
+        );
 
-        runtime.run_action("failedRenameCold").expect_err("semantic failure should abort");
+        runtime
+            .run_action("failedRenameCold")
+            .expect_err("semantic failure should abort");
         assert_eq!(runtime.provider.manifest, manifest_before);
         assert_eq!(runtime.provider.backing, backing_before);
-        assert_eq!(runtime.value("audit").unwrap(), Value::String("idle".into()));
-        assert_eq!(runtime.value("coldName").unwrap(), Value::String("Cold".into()));
+        assert_eq!(
+            runtime.value("audit").unwrap(),
+            Value::String("idle".into())
+        );
+        assert_eq!(
+            runtime.value("coldName").unwrap(),
+            Value::String("Cold".into())
+        );
     }
 }
