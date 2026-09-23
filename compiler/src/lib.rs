@@ -58,6 +58,7 @@ pub struct CheckedSource {
     pub runtime_model_templates: HashMap<String, RuntimeModelTemplate>,
     pub runtime_model_roots: HashMap<String, RuntimeModelRoot>,
     pub(crate) runtime_designations: HashMap<String, RuntimeDesignationMetadata>,
+    pub(crate) runtime_designation_bindings: HashMap<String, String>,
 }
 
 pub fn parse_source(source: &str) -> Result<Program, Vec<Diagnostic>> {
@@ -148,6 +149,8 @@ pub fn check_source_with_runtime_models(source: &str) -> Result<CheckedSource, V
     let runtime_reduction_types = runtime_reduction_typing::check(&runtime_reduction_lowered)?;
     let mut runtime_designations =
         designation_runtime_metadata::collect(&runtime_reduction_lowered);
+    let runtime_designation_bindings =
+        designation_runtime_metadata::collect_bindings(&runtime_reduction_lowered);
     runtime_designations.extend(designation_runtime_metadata::collect_model_members(
         &runtime_model_roots,
         &runtime_model_templates,
@@ -176,5 +179,6 @@ pub fn check_source_with_runtime_models(source: &str) -> Result<CheckedSource, V
         runtime_model_templates,
         runtime_model_roots,
         runtime_designations,
+        runtime_designation_bindings,
     })
 }

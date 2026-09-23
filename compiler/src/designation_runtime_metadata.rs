@@ -11,6 +11,28 @@ pub(crate) struct RuntimeDesignationMetadata {
     pub(crate) allows_none: bool,
 }
 
+pub(crate) fn collect_bindings(program: &Program) -> HashMap<String, String> {
+    program
+        .declarations
+        .iter()
+        .filter_map(|declaration| {
+            let Declaration::State(state) = declaration else {
+                return None;
+            };
+            let type_name = state.type_name.as_deref()?;
+            if decode_live_type_name(type_name).is_none()
+                && decode_maybe_live_type_name(type_name).is_none()
+            {
+                return None;
+            }
+            Some((
+                state.name.clone(),
+                format!("{LOWERED_DESIGNATION_PREFIX}{}", state.name),
+            ))
+        })
+        .collect()
+}
+
 pub(crate) fn collect(program: &Program) -> HashMap<String, RuntimeDesignationMetadata> {
     program
         .declarations

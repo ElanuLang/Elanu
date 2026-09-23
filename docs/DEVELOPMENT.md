@@ -134,6 +134,13 @@ new manifest without reading or rewriting dormant backing. If one explicitly mat
 changes, only that identity's opaque payload plus the candidate manifest need be replaced; unrelated
 backing remains untouched. Provider acceptance still precedes authoritative runtime publication.
 
+`PartialPersistentRuntime::materialize_designation` lets host integration request materialization
+through a top-level source `live T` / `maybe live T` designation name. `CheckedSource` preserves the
+source-designation-to-lowered-binding relationship structurally, so the runtime resolves the exact
+current target and its private backing handle without parsing generated names or exposing dynamic
+identity/backing keys to the host. This remains explicit host-driven materialization, not automatic
+loading on member access.
+
 Backing keys, residency, manifest layout, and materialization are runtime/host infrastructure rather
 than Elanu source concepts. The boundary does not select automatic loading, eviction/cache policy,
 backing garbage collection, content addressing, a database/ORM/query API, or a concrete storage
