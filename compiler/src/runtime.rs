@@ -37,6 +37,8 @@ mod provenance_transfer_execution;
 mod restart_checkpoint_experiment;
 #[cfg(test)]
 mod structural_move_execution;
+#[cfg(test)]
+mod undo_history_negative_evidence;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
