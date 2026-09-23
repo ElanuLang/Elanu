@@ -99,7 +99,7 @@ pub struct RuntimeError {
 }
 
 impl RuntimeError {
-    fn new(message: impl Into<String>) -> Self {
+    pub fn new(message: impl Into<String>) -> Self {
         Self {
             message: message.into(),
         }
