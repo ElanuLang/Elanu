@@ -169,12 +169,16 @@ impl PartiallyMaterializedRuntime {
                 .filter(|member| member.kind == RuntimeModelMemberKind::State)
             {
                 let stored_name = model_binding_name(identity, &member.name);
-                let value = image.state_values.get(&stored_name).cloned().ok_or_else(|| {
-                    RuntimeError::new(format!(
-                        "persistence image is missing dormant state '{identity}.{}'",
-                        member.name
-                    ))
-                })?;
+                let value = image
+                    .state_values
+                    .get(&stored_name)
+                    .cloned()
+                    .ok_or_else(|| {
+                        RuntimeError::new(format!(
+                            "persistence image is missing dormant state '{identity}.{}'",
+                            member.name
+                        ))
+                    })?;
                 state_values.insert(member.name.clone(), value);
                 partial.state_values.remove(&stored_name);
             }
@@ -213,11 +217,10 @@ impl PartiallyMaterializedRuntime {
     }
 
     fn materialize(&mut self, identity: &str) -> Result<(), RuntimeError> {
-        let dormant = self
-            .dormant
-            .get(identity)
-            .cloned()
-            .ok_or_else(|| RuntimeError::new(format!("identity '{identity}' is not dormant")))?;
+        let dormant =
+            self.dormant.get(identity).cloned().ok_or_else(|| {
+                RuntimeError::new(format!("identity '{identity}' is not dormant"))
+            })?;
 
         let current_model = self
             .runtime
@@ -267,16 +270,17 @@ impl PartiallyMaterializedRuntime {
             }
             match member.kind {
                 RuntimeModelMemberKind::State => {
-                    let value = dormant
-                        .state_values
-                        .get(&member.name)
-                        .cloned()
-                        .ok_or_else(|| {
-                            RuntimeError::new(format!(
-                                "dormant backing is missing state '{identity}.{}'",
-                                member.name
-                            ))
-                        })?;
+                    let value =
+                        dormant
+                            .state_values
+                            .get(&member.name)
+                            .cloned()
+                            .ok_or_else(|| {
+                                RuntimeError::new(format!(
+                                    "dormant backing is missing state '{identity}.{}'",
+                                    member.name
+                                ))
+                            })?;
                     states.push((
                         name,
                         StateCell {
@@ -316,9 +320,7 @@ impl PartiallyMaterializedRuntime {
         let mut image = capture_image(&self.runtime, &self.shape)?;
         for (identity, dormant) in &self.dormant {
             let dynamic = image.dynamic_models.get(identity).ok_or_else(|| {
-                RuntimeError::new(format!(
-                    "captured image lost dormant identity '{identity}'"
-                ))
+                RuntimeError::new(format!("captured image lost dormant identity '{identity}'"))
             })?;
             if dynamic.model_name != dormant.model_name || dynamic.owner != dormant.owner {
                 return Err(RuntimeError::new(format!(
@@ -327,7 +329,11 @@ impl PartiallyMaterializedRuntime {
             }
             for (member_name, value) in &dormant.state_values {
                 let stored_name = model_binding_name(identity, member_name);
-                if image.state_values.insert(stored_name, value.clone()).is_some() {
+                if image
+                    .state_values
+                    .insert(stored_name, value.clone())
+                    .is_some()
+                {
                     return Err(RuntimeError::new(format!(
                         "captured image already contains dormant member '{identity}.{member_name}'"
                     )));
@@ -433,12 +439,9 @@ fn dormant_identity_representation_preserves_exact_world_and_materializes_in_pla
     let original_types = fully_materialized.dynamic_model_types.clone();
     let allocator = fully_materialized.next_dynamic_identity;
 
-    let mut partial = PartiallyMaterializedRuntime::restore(
-        checked.clone(),
-        &seed_image,
-        &cold_subtree,
-    )
-    .expect("runtime should restore with Cold subtree dormant");
+    let mut partial =
+        PartiallyMaterializedRuntime::restore(checked.clone(), &seed_image, &cold_subtree)
+            .expect("runtime should restore with Cold subtree dormant");
 
     assert_eq!(partial.runtime.dynamic_model_owners, original_owners);
     assert_eq!(partial.runtime.dynamic_model_types, original_types);
@@ -536,12 +539,8 @@ fn dormant_identity_representation_preserves_exact_world_and_materializes_in_pla
 
     let bytes = partial.capture_full_image().unwrap().encode().unwrap();
     let decoded = PersistenceImage::decode(&bytes).expect("opaque bytes should decode");
-    let mut restarted = PartiallyMaterializedRuntime::restore(
-        checked,
-        &decoded,
-        &cold_subtree,
-    )
-    .expect("fresh process-equivalent runtime should restore Cold dormant again");
+    let mut restarted = PartiallyMaterializedRuntime::restore(checked, &decoded, &cold_subtree)
+        .expect("fresh process-equivalent runtime should restore Cold dormant again");
     assert_eq!(
         restarted.runtime.value("activeName").unwrap(),
         Value::String("Active renamed".to_string())
