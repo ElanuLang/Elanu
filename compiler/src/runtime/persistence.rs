@@ -828,6 +828,9 @@ fn restore_image(
 }
 
 #[cfg(test)]
+mod opaque_dormant_backing_experiment;
+
+#[cfg(test)]
 mod partial_materialization_experiment;
 
 #[cfg(test)]
