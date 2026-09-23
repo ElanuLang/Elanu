@@ -368,6 +368,18 @@ Every concrete modeled-state identity, whether statically declared or dynamicall
 
 Reading modeled state ordinarily remains value-oriented; it does not silently create a writable alias to the live modeled-state world.
 
+A state model may also declare a model-local optional live designation slot:
+
+```elanu
+state model Folder {
+    state restoreParent: maybe live Folder = none
+}
+```
+
+Each concrete `Folder` identity owns its own `restoreParent` designation state. The slot stores either one exact compatible live target identity or absence; it is not ordinary `String` state and does not become a general designation-valued expression. The current bounded surface initializes model-local `maybe live T` with contextual `none`, reaches it through a compatible live owner designation, assigns it with explicit `through`, and may copy its designation into compatible persistent designation state where a designation is expected. Target lifetime termination clears a model-local optional designation under the same non-dangling law as top-level `maybe live T`, and rollback restores the slot with the surrounding action transaction.
+
+Model-local plain `live T` remains unselected. Model-local optional designation state also does not introduce general nullability, writable-state grants to designation slots, ownership, or first-class reference values.
+
 Model-local `derived` uses **rooted locality**: it may directly name that model's own members and may follow explicit live designations obtained through the model's stored topology. It may not silently capture unrelated ambient live state.
 
 This distinction is semantic. Current hidden-name/lowering details are bootstrap implementation behavior.
