@@ -240,17 +240,23 @@ impl MoveLowerer<'_> {
             ));
             return malformed_move(location);
         };
-        let Some(root) = self.roots.get(root_name) else {
+        let (owner_model, designation_owned) = if let Some(root) = self.roots.get(root_name) {
+            (root.model_name.clone(), false)
+        } else if let Some(model) = self.designation_models.get(root_name) {
+            (model.clone(), true)
+        } else {
             self.errors.push(diag(
                 location,
-                format!("'{root_name}' is not a modeled-state owner root"),
+                format!(
+                    "'{root_name}' is not a modeled-state owner root or persistent live designation"
+                ),
             ));
             return malformed_move(location);
         };
-        let Some(owner_template) = self.templates.get(&root.model_name) else {
+        let Some(owner_template) = self.templates.get(&owner_model) else {
             self.errors.push(diag(
                 location,
-                format!("unknown state model '{}'", root.model_name),
+                format!("unknown state model '{owner_model}'"),
             ));
             return malformed_move(location);
         };
@@ -292,6 +298,13 @@ impl MoveLowerer<'_> {
         }
 
         if member.kind == RuntimeModelMemberKind::Derived {
+            if designation_owned {
+                self.errors.push(diag(
+                    location,
+                    "designation-owned filtered structural movement is not yet selected",
+                ));
+                return malformed_move(location);
+            }
             let Expr::Filter {
                 source, order_by, ..
             } = &member.expression
