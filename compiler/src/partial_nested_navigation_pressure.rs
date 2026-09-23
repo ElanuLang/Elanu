@@ -86,5 +86,30 @@ fn existing_bridges_compose_for_designation_rooted_nested_navigation() {
     provider.loads.clear();
     let mut restarted = PartialPersistentRuntime::open(checked, provider)
         .expect("restarted partial runtime should open");
-    assert!(restarted.into_provider().loads.is_empty());
+
+    restarted
+        .materialize_root_member_index("workspace", "folders", 0)
+        .expect("root structural selection should materialize only the selected Folder");
+    restarted
+        .run_action("selectSecondDocument")
+        .expect("resident designated Folder should expose its exact nested Document identity");
+    restarted
+        .materialize_designation("selectedDocument")
+        .expect("selected nested Document should materialize through the existing designation bridge");
+
+    assert_eq!(
+        restarted.value("selectedTitle").unwrap(),
+        Value::String("Second".into())
+    );
+
+    let provider = restarted.into_provider();
+    assert_eq!(
+        provider.loads.len(),
+        2,
+        "only the selected Folder and selected Document should be read"
+    );
+    assert_ne!(
+        provider.loads[0], provider.loads[1],
+        "nested navigation should materialize two distinct modeled identities"
+    );
 }
