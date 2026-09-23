@@ -96,7 +96,8 @@ fn restarted() -> PartialPersistentRuntime<MemoryProvider> {
 
     let mut provider = initial.into_provider();
     provider.loads.clear();
-    PartialPersistentRuntime::open(checked, provider).expect("restarted partial runtime should open")
+    PartialPersistentRuntime::open(checked, provider)
+        .expect("restarted partial runtime should open")
 }
 
 #[test]
