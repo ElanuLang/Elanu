@@ -95,7 +95,9 @@ fn existing_bridges_compose_for_designation_rooted_nested_navigation() {
         .expect("resident designated Folder should expose its exact nested Document identity");
     restarted
         .materialize_designation("selectedDocument")
-        .expect("selected nested Document should materialize through the existing designation bridge");
+        .expect(
+            "selected nested Document should materialize through the existing designation bridge",
+        );
 
     assert_eq!(
         restarted.value("selectedTitle").unwrap(),
