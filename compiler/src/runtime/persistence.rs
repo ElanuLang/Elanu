@@ -828,6 +828,9 @@ fn restore_image(
 }
 
 #[cfg(test)]
+mod partial_materialization_experiment;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::check_source_with_runtime_models;
