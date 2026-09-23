@@ -4,6 +4,8 @@
 
 ### Language and semantics
 
+- Added model-local `maybe live T` state so each concrete modeled identity can persist zero-or-one exact related live identity without encoding a singular relation as `[live T]` structure.
+- Model-local optional designations remain non-owning, transactional, and subject to existing lifetime cleanup; model-local plain `live T`, general nullability/`Option`, and first-class designation values remain unselected.
 - Added explicit `purge target in owner` for permanent termination of a committed transaction-visible lifetime-provenance subtree while retaining leaf-only `destroy` as a separate operation.
 - Purge discovers descendants from provenance rather than structure, reuses existing leaf cleanup leaves-first, observes staged transfers, blocks on plain-live designations, and rejects fresh transaction-local descendants.
 - Broadened existing lifetime `transfer` from leaf-only children to any committed dynamic identity when replacing its parent provenance edge preserves an acyclic transaction-visible provenance relation.
@@ -36,6 +38,7 @@
 
 ### Compiler/runtime
 
+- Attached designation role to runtime state cells so designation metadata follows dynamic state-cell lifetime and existing cleanup/rollback semantics can serve model-local optional designation state without a parallel runtime mechanism.
 - Promoted the proven provenance-subtree post-order termination experiment into the runtime and routed explicit source `purge` through the existing lifetime-termination surface and per-identity cleanup path.
 - Promoted the proven transaction-visible destination-owner-chain cycle check into production transfer and removed the duplicate test-only non-leaf transfer implementation.
 - Added transaction-visible dynamic-owner replacement so later lifetime checks in the same action observe staged provenance transfer and rollback discards it cleanly.
