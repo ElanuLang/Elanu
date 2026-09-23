@@ -19,6 +19,7 @@ state model Workspace {
 state workspace: Workspace
 state selectedFolder: maybe live Folder = none
 state selectedDocument: maybe live Document = none
+state thirdDocument: maybe live Document = none
 
 derived selectedTitle = selectedDocument.title
 
@@ -40,6 +41,7 @@ action seed {
         insert third into selectedFolder.documents
     }
     selectedDocument = selectedFolder.documents[1]
+    thirdDocument = selectedFolder.documents[2]
 }
 
 action nextDocument {
@@ -50,8 +52,16 @@ action previousDocument {
     selectedDocument = previous selectedDocument in selectedFolder.documents
 }
 
+action clearSelectedDocument {
+    selectedDocument = none
+}
+
 action duplicateSelectedOccurrence {
     insert selectedDocument into selectedFolder.documents
+}
+
+action moveSelectedAfterThird {
+    move selectedDocument after thirdDocument in selectedFolder.documents
 }
 "#;
 
@@ -150,6 +160,25 @@ fn relative_boundary_failure_does_not_speculatively_read_child_backing() {
 }
 
 #[test]
+fn absent_anchor_failure_does_not_speculatively_read_child_backing() {
+    let mut runtime = restarted();
+    runtime
+        .materialize_root_member_index("workspace", "folders", 0)
+        .unwrap();
+    runtime.run_action("clearSelectedDocument").unwrap();
+
+    runtime
+        .run_action("nextDocument")
+        .expect_err("absent relative-navigation anchor should fail");
+    let provider = runtime.into_provider();
+    assert_eq!(
+        provider.loads.len(),
+        1,
+        "absent-anchor failure should need only the resident owner structure"
+    );
+}
+
+#[test]
 fn duplicate_anchor_failure_does_not_speculatively_read_child_backing() {
     let mut runtime = restarted();
     runtime
@@ -165,5 +194,33 @@ fn duplicate_anchor_failure_does_not_speculatively_read_child_backing() {
         provider.loads.len(),
         1,
         "ambiguity resolution should need only the resident owner structure"
+    );
+}
+
+#[test]
+fn relative_navigation_uses_current_reordered_structure_without_child_reads() {
+    let mut runtime = restarted();
+    runtime
+        .materialize_root_member_index("workspace", "folders", 0)
+        .unwrap();
+    runtime
+        .run_action("moveSelectedAfterThird")
+        .expect("structural movement should commit using resident Folder structure");
+    runtime
+        .run_action("previousDocument")
+        .expect("relative navigation should use the reordered current structure");
+    runtime
+        .materialize_designation("selectedDocument")
+        .expect("newly selected previous Document should materialize");
+
+    assert_eq!(
+        runtime.value("selectedTitle").unwrap(),
+        Value::String("Third".into())
+    );
+    let provider = runtime.into_provider();
+    assert_eq!(
+        provider.loads.len(),
+        2,
+        "reordering and relative selection should not read dormant sibling backing"
     );
 }
