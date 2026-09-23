@@ -16,7 +16,9 @@ jobs:
         with:
           ref: selected-identity-materialization-pressure
       - name: Wire selected designation materialization
-        run: python .github/scripts/wire_selected_designation_materialization.py
+        run: |
+          python .github/scripts/wire_selected_designation_materialization.py
+          python .github/scripts/fix_selected_designation_format.py
       - name: Validate compiler
         working-directory: compiler
         run: |
