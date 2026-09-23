@@ -1,0 +1,37 @@
+name: Partial persistence runtime promotion
+
+on:
+  push:
+    branches:
+      - promote-partial-persistence-runtime
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: promote-partial-persistence-runtime
+      - name: Wire production module
+        run: python .github/scripts/wire_partial_persistence_runtime.py
+      - name: Validate compiler
+        working-directory: compiler
+        run: |
+          cargo fmt
+          cargo fmt --check
+          cargo clippy -- -D warnings
+          cargo test runtime::persistence::partial::tests
+          cargo test
+          cargo build
+      - name: Commit validated production changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add compiler/src/runtime/persistence.rs compiler/src/runtime/persistence/partial.rs
+          if ! git diff --cached --quiet; then
+            git commit -m "Wire production partial persistence runtime"
+            git push origin HEAD:promote-partial-persistence-runtime
+          fi
