@@ -18,6 +18,8 @@ mod model_types;
 #[cfg(test)]
 mod nested_folder_composition_tests;
 pub mod parser;
+#[cfg(test)]
+mod partial_nested_navigation_pressure;
 mod program_facts;
 pub mod reduction_integration;
 pub mod reduction_lowering;
