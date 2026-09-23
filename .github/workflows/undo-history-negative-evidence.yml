@@ -1,0 +1,34 @@
+name: Undo history negative evidence
+
+on:
+  push:
+    branches:
+      - undo-history-negative-evidence
+
+permissions:
+  contents: write
+
+jobs:
+  experiment:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: undo-history-negative-evidence
+      - run: python .github/scripts/add_undo_history_negative_evidence.py
+      - name: Validate undo history experiment
+        run: |
+          cd compiler
+          cargo fmt
+          cargo fmt --check
+          cargo clippy -- -D warnings
+          cargo test runtime::undo_history_negative_evidence:: -- --nocapture
+          cargo build
+          cd ..
+      - name: Commit experiment
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add compiler/src/runtime.rs compiler/src/runtime/undo_history_negative_evidence.rs
+          git commit -m "Prove undo history from opaque persistence images"
+          git push origin HEAD:undo-history-negative-evidence
