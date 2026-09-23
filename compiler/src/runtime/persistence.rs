@@ -2,6 +2,8 @@ use std::collections::{HashMap, HashSet};
 
 use super::*;
 
+pub mod partial;
+
 const PERSISTENCE_ENCODING_MAGIC: &[u8; 8] = b"ELANUPST";
 const PERSISTENCE_ENCODING_VERSION: u32 = 1;
 

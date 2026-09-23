@@ -121,6 +121,25 @@ validates malformed or unsupported payloads before application-shape compatibili
 Providers may store these bytes but must not interpret the private payload. The byte format remains
 runtime implementation compatibility rather than Elanu source semantics or a provider schema.
 
+
+For large partially resident worlds, `runtime::persistence::partial` provides a separate production
+host boundary without changing the existing monolithic `PersistentRuntime`. `PartialPersistentRuntime`
+backs each dynamic modeled identity with a runtime-owned opaque key when that identity first becomes
+durable. After process restart, backed identities retain exact model/lifetime identity metadata while
+their member cells remain dormant until the host explicitly calls `materialize` with one opaque key.
+
+`PartialPersistenceProvider` stores an opaque manifest plus opaque key/payload pairs and exposes one
+atomic `replace_candidate(manifest, changed_backing)` operation. Resident-only actions may publish a
+new manifest without reading or rewriting dormant backing. If one explicitly materialized identity
+changes, only that identity's opaque payload plus the candidate manifest need be replaced; unrelated
+backing remains untouched. Provider acceptance still precedes authoritative runtime publication.
+
+Backing keys, residency, manifest layout, and materialization are runtime/host infrastructure rather
+than Elanu source concepts. The boundary does not select automatic loading, eviction/cache policy,
+backing garbage collection, content addressing, a database/ORM/query API, or a concrete storage
+backend. Providers must treat manifest, keys, and backing payloads as uninterpreted runtime-owned
+bytes and must not reconstruct model-member or generated-name semantics from them.
+
 ## Rust validation
 
 Normal local validation from `compiler/` is:
