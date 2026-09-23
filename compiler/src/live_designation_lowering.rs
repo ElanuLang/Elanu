@@ -305,6 +305,114 @@ fn designation_is_available(info: &DesignationInfo, declaration_index: usize) ->
     info.kind == DesignationKind::Scoped || info.declaration_index < declaration_index
 }
 
+fn lower_model_local_designation_read(
+    name: &str,
+    expected: &DesignationInfo,
+    context: &DesignationExprContext<'_>,
+    errors: &mut Vec<Diagnostic>,
+) -> Option<Expr> {
+    let (owner_name, member) = name.split_once('.')?;
+    if member.contains('.') {
+        return None;
+    }
+    let owner = context.designations.get(owner_name)?;
+    if !designation_is_available(owner, context.declaration_index) {
+        errors.push(diag(
+            context.location,
+            format!(
+                "live designation '{}' is not available before its declaration",
+                owner_name
+            ),
+        ));
+        return Some(Expr::String(String::new()));
+    }
+    let template = context.templates.get(&owner.model_name)?;
+    let member_template = template.member(member)?;
+    let designation = member_template.designation.as_ref()?;
+    if designation.model_name != expected.model_name {
+        errors.push(diag(
+            context.location,
+            format!(
+                "model-local designation '{}.{}' has type maybe live {} but '{}' requires live {}",
+                owner_name,
+                member,
+                designation.model_name,
+                expected.source_name,
+                expected.model_name
+            ),
+        ));
+        return Some(Expr::String(String::new()));
+    }
+    if designation.allows_none && !expected.allows_none {
+        errors.push(diag(
+            context.location,
+            format!(
+                "model-local maybe live {} designation '{}.{}' may be absent but '{}' requires plain live {}",
+                designation.model_name, owner_name, member, expected.source_name, expected.model_name
+            ),
+        ));
+        return Some(Expr::String(String::new()));
+    }
+    Some(Expr::RuntimeDesignationMember {
+        designation: Box::new(Expr::Name(owner.lowered_name.clone())),
+        member: member.to_string(),
+        element_model: owner.model_name.clone(),
+        member_type_name: "String".to_string(),
+    })
+}
+
+fn lower_model_local_designation_assignment_value(
+    expression: &Expr,
+    target_model: &str,
+    location: SourceLocation,
+    declaration_index: usize,
+    designations: &HashMap<String, DesignationInfo>,
+    errors: &mut Vec<Diagnostic>,
+) -> Expr {
+    let Expr::Name(name) = expression else {
+        errors.push(diag(
+            location,
+            format!(
+                "model-local maybe live {target_model} assignment requires a compatible persistent designation or 'none'"
+            ),
+        ));
+        return Expr::String(String::new());
+    };
+    if name == "none" {
+        return Expr::String(String::new());
+    }
+    let Some(source) = designations.get(name) else {
+        errors.push(diag(
+            location,
+            format!(
+                "model-local maybe live {target_model} assignment requires a compatible persistent designation or 'none'; '{name}' is not one"
+            ),
+        ));
+        return Expr::String(String::new());
+    };
+    if !designation_is_available(source, declaration_index) {
+        errors.push(diag(
+            location,
+            format!(
+                "live designation '{}' is not available before its declaration",
+                name
+            ),
+        ));
+        return Expr::String(String::new());
+    }
+    if source.model_name != target_model {
+        errors.push(diag(
+            location,
+            format!(
+                "live designation '{}' has type live {} but model-local slot requires maybe live {}",
+                source.source_name, source.model_name, target_model
+            ),
+        ));
+        return Expr::String(String::new());
+    }
+    Expr::Name(source.lowered_name.clone())
+}
+
 fn check_duplicate_source_names(program: &Program, errors: &mut Vec<Diagnostic>) {
     let mut seen = HashSet::new();
     for declaration in &program.declarations {
@@ -346,6 +454,12 @@ fn lower_designation_expr(
                     ),
                 ));
                 return Expr::String(String::new());
+            }
+
+            if let Some(lowered) =
+                lower_model_local_designation_read(name, expected, context, errors)
+            {
+                return lowered;
             }
 
             if let Some(root_name) = decode_live_capture(name) {
@@ -944,6 +1058,16 @@ fn lower_designation_member_read(
     let Some(member_template) = template.member(member) else {
         return Expr::Integer(0);
     };
+    if let Some(designation) = &member_template.designation {
+        errors.push(diag(
+            location,
+            format!(
+                "model-local maybe live {} designation '{}.{}' is not an ordinary value; use it in a compatible designation context",
+                designation.model_name, info.source_name, member
+            ),
+        ));
+        return Expr::Integer(0);
+    }
     Expr::RuntimeDesignationMember {
         designation: Box::new(Expr::Name(info.lowered_name.clone())),
         member: member.to_string(),
@@ -969,20 +1093,12 @@ fn lower_statement(
             value,
         } => {
             if let Some(path) = decode_through_path(target) {
-                let lowered_value = lower_expr(
-                    value,
-                    *location,
-                    declaration_index,
-                    designations,
-                    models,
-                    templates,
-                    errors,
-                );
                 return lower_through_assignment(
                     path,
                     *location,
                     *operator,
-                    lowered_value,
+                    value,
+                    declaration_index,
                     designations,
                     models,
                     templates,
@@ -1200,7 +1316,8 @@ fn lower_through_assignment(
     path: &str,
     location: SourceLocation,
     operator: AssignmentOperator,
-    value: Expr,
+    value: &Expr,
+    declaration_index: usize,
     designations: &HashMap<String, DesignationInfo>,
     models: &HashMap<String, ModelInfo>,
     templates: &HashMap<String, RuntimeModelTemplate>,
@@ -1215,7 +1332,7 @@ fn lower_through_assignment(
             location,
             target: path.to_string(),
             operator,
-            value,
+            value: value.clone(),
         };
     };
 
@@ -1228,7 +1345,7 @@ fn lower_through_assignment(
             location,
             target: path.to_string(),
             operator,
-            value,
+            value: value.clone(),
         };
     };
 
@@ -1237,7 +1354,7 @@ fn lower_through_assignment(
             location,
             target: path.to_string(),
             operator,
-            value,
+            value: value.clone(),
         };
     };
     match model.members.get(member) {
@@ -1267,7 +1384,7 @@ fn lower_through_assignment(
             location,
             target: path.to_string(),
             operator,
-            value,
+            value: value.clone(),
         };
     };
     let Some(member_template) = template.member(member) else {
@@ -1275,9 +1392,46 @@ fn lower_through_assignment(
             location,
             target: path.to_string(),
             operator,
-            value,
+            value: value.clone(),
         };
     };
+    if let Some(designation) = &member_template.designation {
+        if operator != AssignmentOperator::Assign {
+            errors.push(diag(
+                location,
+                format!(
+                    "model-local maybe live {} designation '{}.{}' supports selection assignment only",
+                    designation.model_name, designation_name, member
+                ),
+            ));
+        }
+        let lowered_value = lower_model_local_designation_assignment_value(
+            value,
+            &designation.model_name,
+            location,
+            declaration_index,
+            designations,
+            errors,
+        );
+        return Statement::RuntimeDesignationAssignment {
+            location,
+            designation: Box::new(Expr::Name(info.lowered_name.clone())),
+            member: member.to_string(),
+            element_model: info.model_name.clone(),
+            member_type_name: "String".to_string(),
+            operator: AssignmentOperator::Assign,
+            value: lowered_value,
+        };
+    }
+    let lowered_value = lower_expr(
+        value,
+        location,
+        declaration_index,
+        designations,
+        models,
+        templates,
+        errors,
+    );
     Statement::RuntimeDesignationAssignment {
         location,
         designation: Box::new(Expr::Name(info.lowered_name.clone())),
@@ -1285,7 +1439,7 @@ fn lower_through_assignment(
         element_model: info.model_name.clone(),
         member_type_name: runtime_value_type_name(&member_template.value_type),
         operator,
-        value,
+        value: lowered_value,
     }
 }
 

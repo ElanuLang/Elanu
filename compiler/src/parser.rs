@@ -113,7 +113,19 @@ impl Parser {
         self.advance();
         let name = self.consume_identifier("expected state member name")?;
         let type_name = if self.matches_simple(&TokenKind::Colon) {
-            Some(self.consume_identifier("expected type name after ':'")?)
+            if self.check_identifier_value("maybe") {
+                self.advance();
+                self.consume_simple(
+                    &TokenKind::Live,
+                    "expected 'live' after 'maybe' in state-model designation member type",
+                )?;
+                let model = self.consume_identifier(
+                    "expected state model name after 'maybe live' in state-model member",
+                )?;
+                Some(encode_maybe_live_type_name(&model))
+            } else {
+                Some(self.consume_identifier("expected type name after ':'")?)
+            }
         } else {
             None
         };

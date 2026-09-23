@@ -19,6 +19,7 @@ struct ModelMemberInfo {
     name: String,
     kind: ModelMemberKind,
     value_type: ValueType,
+    designation: bool,
     expression: Expr,
     location: SourceLocation,
 }
@@ -199,10 +200,16 @@ fn build_models(
 
         for member in &model.members {
             let name = member.name().to_string();
+            let designation = resolved.member_designation(&name).is_some();
             let (kind, expression) = match member {
-                StateModelMember::State(state) => {
-                    (ModelMemberKind::State, state.initializer.clone())
-                }
+                StateModelMember::State(state) => (
+                    ModelMemberKind::State,
+                    if designation {
+                        Expr::String(String::new())
+                    } else {
+                        state.initializer.clone()
+                    },
+                ),
                 StateModelMember::Derived(derived) => {
                     (ModelMemberKind::Derived, derived.expression.clone())
                 }
@@ -217,6 +224,7 @@ fn build_models(
                 name,
                 kind,
                 value_type,
+                designation,
                 expression,
                 location: member.location(),
             });
@@ -829,6 +837,16 @@ fn lower_member_expr(
             ));
             return Expr::Integer(0);
         };
+        if member.designation {
+            errors.push(diag(
+                location,
+                format!(
+                    "model-local maybe live designation '{}.{}' is not an ordinary value; use it in a compatible designation context",
+                    root, member_name
+                ),
+            ));
+            return Expr::Integer(0);
+        }
         return Expr::Name(model_binding_name(root, &member.name));
     }
 
@@ -846,6 +864,16 @@ fn lower_member_expr(
             ));
             return Expr::Integer(0);
         };
+        if member.designation {
+            errors.push(diag(
+                location,
+                format!(
+                    "model-local maybe live designation '{}.{}' is not an ordinary value; use it in a compatible designation context",
+                    root, member_name
+                ),
+            ));
+            return Expr::Integer(0);
+        }
 
         return match member.kind {
             ModelMemberKind::State => Expr::Name(
@@ -962,6 +990,16 @@ fn lower_assignment_target(
                 ));
                 return target.to_string();
             };
+            if member.designation {
+                errors.push(diag(
+                    location,
+                    format!(
+                        "model-local maybe live designation '{}.{}' requires designation assignment through a live owner designation",
+                        root, member_name
+                    ),
+                ));
+                return target.to_string();
+            }
             return model_binding_name(root, &member.name);
         }
 
@@ -981,6 +1019,16 @@ fn lower_assignment_target(
                 errors.push(diag(
                     location,
                     format!("cannot assign to derived member '{}.{}'", root, member_name),
+                ));
+                return target.to_string();
+            }
+            if member.designation {
+                errors.push(diag(
+                    location,
+                    format!(
+                        "model-local maybe live designation '{}.{}' requires designation assignment through a live owner designation",
+                        root, member_name
+                    ),
                 ));
                 return target.to_string();
             }
@@ -1042,6 +1090,16 @@ fn lower_state_grant(
                 ));
                 return name.to_string();
             }
+            if member.designation {
+                errors.push(diag(
+                    location,
+                    format!(
+                        "model-local maybe live designation '{}.{}' cannot be granted as ordinary writable state",
+                        root, member_name
+                    ),
+                ));
+                return name.to_string();
+            }
             return model_binding_name(root, member_name);
         }
 
@@ -1062,6 +1120,16 @@ fn lower_state_grant(
                     location,
                     format!(
                         "cannot grant derived member '{}.{}' as writable state",
+                        root, member_name
+                    ),
+                ));
+                return name.to_string();
+            }
+            if member.designation {
+                errors.push(diag(
+                    location,
+                    format!(
+                        "model-local maybe live designation '{}.{}' cannot be granted as ordinary writable state",
                         root, member_name
                     ),
                 ));

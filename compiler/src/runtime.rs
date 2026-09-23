@@ -509,7 +509,7 @@ impl Runtime {
             let cell = StateCell {
                 value,
                 value_type: member.value_type.clone(),
-                designation: None,
+                designation: member.designation.clone(),
                 dependents: HashSet::new(),
             };
             self.transaction
