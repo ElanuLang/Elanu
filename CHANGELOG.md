@@ -38,6 +38,7 @@
 
 ### Compiler/runtime
 
+- Added runtime-owned deterministic opaque persistence image encoding/decoding with explicit format versioning and validation, allowing providers to store uninterpreted bytes across process restart without exposing image internals or selecting a storage backend.
 - Promoted the proven restart image, persisted-shape compatibility check, provider `load`/atomic-`replace` boundary, and candidate-before-publication ordering into the public synchronous `runtime::persistence` host API without adding source persistence syntax or choosing a storage backend.
 - Attached designation role to runtime state cells so designation metadata follows dynamic state-cell lifetime and existing cleanup/rollback semantics can serve model-local optional designation state without a parallel runtime mechanism.
 - Promoted the proven provenance-subtree post-order termination experiment into the runtime and routed explicit source `purge` through the existing lifetime-termination surface and per-identity cleanup path.

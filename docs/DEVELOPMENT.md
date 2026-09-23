@@ -115,6 +115,12 @@ themselves invalidate an image.
 This boundary does not select a disk/database format, source `save`/`load`, schema migration,
 async durability, crash recovery, retries, or general external-effect semantics.
 
+`PersistenceImage::encode` and `PersistenceImage::decode` provide the runtime-owned opaque byte
+boundary for process-to-process storage. The runtime format carries its own encoding version and
+validates malformed or unsupported payloads before application-shape compatibility and restore.
+Providers may store these bytes but must not interpret the private payload. The byte format remains
+runtime implementation compatibility rather than Elanu source semantics or a provider schema.
+
 ## Rust validation
 
 Normal local validation from `compiler/` is:
