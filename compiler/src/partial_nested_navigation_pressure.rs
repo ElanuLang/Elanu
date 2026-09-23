@@ -25,16 +25,16 @@ derived selectedTitle = selectedDocument.title
 action seed {
     create Folder in workspace as folder {
         insert folder into workspace.folders
-        create Document in folder as first {
-            through first.title = "First"
-            insert first into folder.documents
-        }
-        create Document in folder as second {
-            through second.title = "Second"
-            insert second into folder.documents
-        }
     }
     selectedFolder = workspace.folders[0]
+    create Document in selectedFolder as first {
+        through first.title = "First"
+        insert first into selectedFolder.documents
+    }
+    create Document in selectedFolder as second {
+        through second.title = "Second"
+        insert second into selectedFolder.documents
+    }
 }
 
 action selectSecondDocument {
