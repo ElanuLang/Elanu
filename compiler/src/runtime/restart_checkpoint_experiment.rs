@@ -228,7 +228,7 @@ derived selectedInTrash = selectedFolder is in trashFolder.folders
 derived selectedName = selectedFolder.name
 derived firstDocumentTitle = selectedFolder.documents[0].title
 
-action seedAndTrash {
+action seed {
     create Folder in workspace as source {
         through source.name = "Source"
         insert source into workspace.folders
@@ -251,7 +251,9 @@ action seedAndTrash {
         through document.title = "Draft"
         insert document into selectedFolder.documents
     }
+}
 
+action moveToTrash {
     through selectedFolder.restoreParent = sourceFolder
     transfer selectedFolder from sourceFolder to trashFolder
     insert selectedFolder into trashFolder.folders
@@ -291,15 +293,20 @@ fn checked_source() -> crate::CheckedSource {
     check_source_with_runtime_models(SOURCE).expect("restart pressure source should check")
 }
 
+fn seed_and_move_to_trash(runtime: &mut Runtime) {
+    runtime.run_action("seed").expect("seed should commit");
+    runtime
+        .run_action("moveToTrash")
+        .expect("Trash move of committed folder should commit");
+}
+
 #[test]
 fn checkpoint_restores_committed_identity_state_structure_designation_and_provenance() {
     let checked = checked_source();
     let mut original =
         Runtime::from_checked_source(&checked).expect("original runtime should initialize");
 
-    original
-        .run_action("seedAndTrash")
-        .expect("seed and Trash move should commit");
+    seed_and_move_to_trash(&mut original);
     original
         .run_action("failedRename")
         .expect_err("failed work must not become committed restart state");
@@ -376,9 +383,7 @@ fn checkpoint_restores_committed_identity_state_structure_designation_and_proven
 fn checkpoint_rejects_active_transaction_and_does_not_capture_staged_work() {
     let checked = checked_source();
     let mut runtime = Runtime::from_checked_source(&checked).expect("runtime should initialize");
-    runtime
-        .run_action("seedAndTrash")
-        .expect("seed should commit");
+    seed_and_move_to_trash(&mut runtime);
 
     runtime.transaction = Some(Transaction::default());
     runtime
