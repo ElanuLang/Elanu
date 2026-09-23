@@ -1,7 +1,8 @@
 from pathlib import Path
 
-# Make the lowering producer available within the crate so CheckedSource can
-# retain the exact binding rather than another subsystem reconstructing it.
+# Expose the actual model-lowering binding producer within the crate so
+# CheckedSource can retain exact ordinary stored-member bindings rather than
+# another subsystem reconstructing the private naming convention.
 model = Path("compiler/src/model_lowering.rs")
 text = model.read_text()
 old = '''fn model_binding_name(root: &str, member: &str) -> String {
@@ -28,10 +29,25 @@ if "runtime_model_root_member_bindings" not in text:
         raise SystemExit("CheckedSource root field anchor not found")
     text = text.replace(field_anchor, field, 1)
 
-collect_anchor = '''    let runtime_model_roots =
-        runtime_model_templates::collect_roots(&program, &runtime_model_templates);
+# Build the final source root/member -> runtime state mapping only after model
+# sequence externalization is known. Externalized sequence provenance already
+# carries owner_root/member_name structurally, so it overrides the ordinary
+# model-lowering binding for those members.
+sequence_anchor = '''    let model_sequence_integration::ModelSequenceLowering {
+        program: model_sequence_lowered,
+        externalized_sequences,
+    } = model_sequence_integration::lower(&filter_prepared)?;
 '''
-collect = collect_anchor + '''    let runtime_model_root_member_bindings = runtime_model_roots
+sequence_addition = sequence_anchor + '''    let externalized_root_member_bindings = externalized_sequences
+        .iter()
+        .map(|(binding, sequence)| {
+            (
+                (sequence.owner_root.clone(), sequence.member_name.clone()),
+                binding.clone(),
+            )
+        })
+        .collect::<HashMap<_, _>>();
+    let runtime_model_root_member_bindings = runtime_model_roots
         .iter()
         .filter_map(|(root_name, root)| {
             let template = runtime_model_templates.get(&root.model_name)?;
@@ -40,20 +56,21 @@ collect = collect_anchor + '''    let runtime_model_root_member_bindings = runti
                 .iter()
                 .filter(|member| member.kind == runtime_model_templates::RuntimeModelMemberKind::State)
                 .map(|member| {
-                    (
-                        member.name.clone(),
-                        model_lowering::model_binding_name(root_name, &member.name),
-                    )
+                    let binding = externalized_root_member_bindings
+                        .get(&(root_name.clone(), member.name.clone()))
+                        .cloned()
+                        .unwrap_or_else(|| model_lowering::model_binding_name(root_name, &member.name));
+                    (member.name.clone(), binding)
                 })
                 .collect::<HashMap<_, _>>();
             Some((root_name.clone(), bindings))
         })
         .collect::<HashMap<_, _>>();
 '''
-if "let runtime_model_root_member_bindings" not in text:
-    if collect_anchor not in text:
-        raise SystemExit("root collection anchor not found")
-    text = text.replace(collect_anchor, collect, 1)
+if "let externalized_root_member_bindings" not in text:
+    if sequence_anchor not in text:
+        raise SystemExit("model sequence lowering anchor not found")
+    text = text.replace(sequence_anchor, sequence_addition, 1)
 
 init_anchor = '''        runtime_model_templates,
         runtime_model_roots,
