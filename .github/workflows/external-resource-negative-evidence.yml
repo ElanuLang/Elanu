@@ -1,0 +1,34 @@
+name: External resource negative evidence
+
+on:
+  push:
+    branches:
+      - external-resource-negative-evidence
+
+permissions:
+  contents: write
+
+jobs:
+  experiment:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: external-resource-negative-evidence
+      - run: python .github/scripts/add_external_resource_negative_evidence.py
+      - name: Validate external resource experiment
+        run: |
+          cd compiler
+          cargo fmt
+          cargo fmt --check
+          cargo clippy -- -D warnings
+          cargo test runtime::external_resource_negative_evidence:: -- --nocapture
+          cargo build
+          cd ..
+      - name: Commit experiment
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add compiler/src/runtime.rs compiler/src/runtime/external_resource_negative_evidence.rs
+          git commit -m "Prove transactional external resource host composition"
+          git push origin HEAD:external-resource-negative-evidence
