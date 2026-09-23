@@ -25,6 +25,8 @@ use crate::CheckedSource;
 #[cfg(test)]
 mod designation_metadata_execution;
 #[cfg(test)]
+mod external_resource_negative_evidence;
+#[cfg(test)]
 mod lifetime_termination_execution;
 #[cfg(test)]
 mod model_local_designation_experiment;
