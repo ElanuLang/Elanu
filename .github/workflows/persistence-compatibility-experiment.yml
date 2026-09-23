@@ -1,0 +1,36 @@
+name: Persistence compatibility experiment
+
+on:
+  push:
+    branches:
+      - persistence-compatibility-experiment
+
+permissions:
+  contents: write
+
+jobs:
+  experiment:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: persistence-compatibility-experiment
+      - run: python .github/scripts/add_persistence_compatibility_experiment.py
+      - name: Format and run compatibility tests
+        run: |
+          cd compiler
+          cargo fmt
+          cargo test runtime::restart_checkpoint_experiment::identical_checked_shape -- --nocapture
+          cargo test runtime::restart_checkpoint_experiment::incompatible_stored_state_shape -- --nocapture
+          cargo test runtime::restart_checkpoint_experiment::formatting_and_action_body_changes -- --nocapture
+          cargo test runtime::restart_checkpoint_experiment::provider_ -- --nocapture
+          cargo test runtime::restart_checkpoint_experiment::durable_ -- --nocapture
+          cargo test runtime::restart_checkpoint_experiment::checkpoint_ -- --nocapture
+          cd ..
+      - name: Commit runtime-only experiment
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add compiler/src/runtime/restart_checkpoint_experiment.rs
+          git commit -m "Prove persistence image compatibility boundary"
+          git push origin HEAD:persistence-compatibility-experiment
