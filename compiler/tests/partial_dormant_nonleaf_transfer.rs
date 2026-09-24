@@ -91,6 +91,7 @@ struct MemoryProvider {
     backing: HashMap<Vec<u8>, Vec<u8>>,
     loads: Vec<Vec<u8>>,
     replacements: Vec<Vec<Vec<u8>>>,
+    reject_next: bool,
 }
 
 impl PartialPersistenceProvider for MemoryProvider {
@@ -108,6 +109,11 @@ impl PartialPersistenceProvider for MemoryProvider {
         manifest: &[u8],
         backing_replacements: &[(Vec<u8>, Vec<u8>)],
     ) -> Result<(), RuntimeError> {
+        if self.reject_next {
+            self.reject_next = false;
+            return Err(RuntimeError::new("provider rejected candidate"));
+        }
+
         let mut candidate = self.backing.clone();
         for (key, payload) in backing_replacements {
             candidate.insert(key.clone(), payload.clone());
@@ -228,5 +234,94 @@ fn transfer_dormant_nonleaf_changes_only_parent_provenance_edge() {
     assert_eq!(
         restarted.value("observedTitle").unwrap(),
         Value::String("Descendant".into())
+    );
+}
+
+#[test]
+fn rejected_dormant_nonleaf_transfer_preserves_prior_provenance_and_retries() {
+    let checked = check_source_with_runtime_models(SOURCE)
+        .expect("dormant nonleaf transfer pressure source should check");
+    let mut initial = PartialPersistentRuntime::open(checked.clone(), MemoryProvider::default())
+        .expect("fresh partial runtime should open");
+    initial.run_action("seed").expect("seed should publish");
+
+    let mut provider = initial.into_provider();
+    provider.loads.clear();
+    provider.replacements.clear();
+    let manifest_before = provider.manifest.clone();
+    let backing_before = provider.backing.clone();
+    provider.reject_next = true;
+
+    let mut runtime = PartialPersistentRuntime::open(checked.clone(), provider)
+        .expect("restart should open prior durable world");
+    runtime
+        .materialize_designation("sourceFolder")
+        .expect("source Folder should materialize before rejected transfer");
+    runtime
+        .materialize_designation("destinationFolder")
+        .expect("destination Folder should materialize before rejected transfer");
+    runtime
+        .run_action("transferChild")
+        .expect_err("provider rejection must reject provenance transfer atomically");
+
+    let mut provider = runtime.into_provider();
+    assert_eq!(provider.manifest, manifest_before);
+    assert_eq!(provider.backing, backing_before);
+    assert_eq!(
+        provider.loads.len(),
+        2,
+        "rejected transfer must not read child or descendant backing"
+    );
+    assert!(
+        provider.replacements.is_empty(),
+        "rejected provenance candidate must not become an accepted replacement"
+    );
+
+    provider.loads.clear();
+    let mut restarted = PartialPersistentRuntime::open(checked, provider)
+        .expect("prior durable world should remain restartable after rejection");
+    restarted
+        .run_action("proveSourceOwnsChild")
+        .expect("rejected transfer must preserve the original child owner");
+    restarted
+        .run_action("proveDestinationOwnsChild")
+        .expect_err("rejected transfer must not publish the destination owner");
+    restarted.run_action("proveChildStillOwnsDocument").expect(
+        "rejected parent transfer must preserve the descendant provenance edge",
+    );
+    assert!(
+        restarted.into_provider().loads.is_empty(),
+        "provenance verification after rejection must not materialize dormant backing"
+    );
+
+    let mut retried = PartialPersistentRuntime::open(
+        check_source_with_runtime_models(SOURCE).expect("source should still check"),
+        {
+            let mut provider = MemoryProvider::default();
+            provider.manifest = manifest_before;
+            provider.backing = backing_before;
+            provider
+        },
+    )
+    .expect("prior durable world should remain retryable");
+    retried
+        .run_action("transferChild")
+        .expect("same provenance-only transfer should succeed on retry");
+    retried
+        .run_action("proveDestinationOwnsChild")
+        .expect("successful retry must publish the destination owner");
+    retried
+        .run_action("proveSourceOwnsChild")
+        .expect_err("successful retry must retire the source owner proof");
+
+    let provider = retried.into_provider();
+    assert!(
+        provider.loads.is_empty(),
+        "retry should use persisted provenance metadata without backing reads"
+    );
+    assert_eq!(
+        provider.replacements.last(),
+        Some(&Vec::<Vec<u8>>::new()),
+        "retry should still publish only manifest provenance metadata"
     );
 }
