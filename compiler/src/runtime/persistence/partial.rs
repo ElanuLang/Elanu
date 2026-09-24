@@ -395,13 +395,13 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
 
         let mut affected = candidate_backed
             .iter()
-            .filter_map(|(identity, handle)| {
-                (!identity_is_resident(&self.checked, candidate, identity)
+            .filter(|(identity, handle)| {
+                !identity_is_resident(&self.checked, candidate, identity)
                     && !handle
                         .structural_targets
-                        .is_disjoint(terminated_model_identities))
-                .then(|| identity.clone())
+                        .is_disjoint(terminated_model_identities)
             })
+            .map(|(identity, _)| identity.clone())
             .collect::<Vec<_>>();
         affected.sort();
 
