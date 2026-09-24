@@ -152,12 +152,6 @@ fn rejected_dormant_purge_preserves_foreign_backing_and_retries_atomically() {
         4,
         "rejected purge must leave every prior modeled identity live and dormant"
     );
-    runtime
-        .run_action("proveLeftOwnsRoot")
-        .expect("rejected purge must preserve root provenance in the authoritative runtime");
-    runtime
-        .run_action("proveRightOwnsForeign")
-        .expect("rejected purge must preserve foreign provenance in the authoritative runtime");
 
     let mut rejected = runtime.into_provider();
     assert_eq!(rejected.manifest, manifest_before);
@@ -176,6 +170,23 @@ fn rejected_dormant_purge_preserves_foreign_backing_and_retries_atomically() {
     assert!(
         rejected.replacements.is_empty(),
         "rejected candidate must not become an accepted backing replacement"
+    );
+
+    let mut metadata_provider = rejected.clone();
+    metadata_provider.loads.clear();
+    metadata_provider.attempts.clear();
+    metadata_provider.replacements.clear();
+    let mut metadata = PartialPersistentRuntime::open(checked.clone(), metadata_provider)
+        .expect("rejected durable world should preserve the prior provenance world");
+    metadata
+        .run_action("proveLeftOwnsRoot")
+        .expect("rejected purge must preserve root provenance");
+    metadata
+        .run_action("proveRightOwnsForeign")
+        .expect("rejected purge must preserve foreign provenance");
+    assert!(
+        metadata.into_provider().loads.is_empty(),
+        "post-rejection provenance proofs should remain metadata-only"
     );
 
     let mut inspection_provider = rejected.clone();
