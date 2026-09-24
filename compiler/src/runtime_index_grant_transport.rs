@@ -325,6 +325,7 @@ fn parse_designation_member_grant(
     designation_models: &HashMap<String, String>,
     templates: &HashMap<String, RuntimeModelTemplate>,
 ) -> Option<(String, String, String)> {
+    let name = decode_through_path(name).unwrap_or(name);
     let (designation, member) = name.split_once('.')?;
     if designation.is_empty() || member.is_empty() || member.contains('.') {
         return None;
