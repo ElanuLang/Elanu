@@ -1973,11 +1973,6 @@ impl Runtime {
                             )));
                         }
                     };
-                    if !self.model_identity_exists(&target) {
-                        return Err(RuntimeError::new(format!(
-                            "unknown live identity '{target}'"
-                        )));
-                    }
                     Ok(model_binding_name(&target, &member))
                 }
                 _ => Err(RuntimeError::new(format!(
