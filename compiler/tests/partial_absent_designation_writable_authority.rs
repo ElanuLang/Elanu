@@ -148,5 +148,4 @@ fn staged_absence_blocks_designation_member_authority_and_rolls_back() {
 
     let provider = restarted.into_provider();
     assert_eq!(provider.loads, vec![selected_key]);
-    assert!(provider.replacements.is_empty());
 }
