@@ -105,23 +105,20 @@ fn destroy_must_clear_model_local_optional_designation_owned_by_dormant_foreign_
         3,
         "both Folders and the selected Document should begin dormant"
     );
-    assert!(runtime.into_provider().loads.is_empty());
 
-    let mut provider = initial_provider_from_seed(checked.clone());
-    provider.loads.clear();
-    let mut runtime = PartialPersistentRuntime::open(checked.clone(), provider)
-        .expect("second restart should open without dynamic backing reads");
     runtime
         .materialize_root_member_index("workspace", "folders", 0)
         .expect("lifetime-owner Folder should materialize");
     runtime
         .run_action("destroySelected")
         .expect("destroy should satisfy model-local optional-designation cleanup");
+    let dormant = runtime.dormant_backing_keys();
     assert_eq!(
-        runtime.dormant_backing_keys().len(),
+        dormant.len(),
         1,
         "destroyed Document should cease to be backed while foreign Folder stays dormant"
     );
+    let foreign_key = dormant[0].clone();
 
     let mut provider = runtime.into_provider();
     provider.loads.clear();
@@ -141,11 +138,11 @@ fn destroy_must_clear_model_local_optional_designation_owned_by_dormant_foreign_
         "model-local optional designation must not retain the terminated identity: {}",
         error.message
     );
-}
 
-fn initial_provider_from_seed(checked: elanu_compiler::CheckedSource) -> MemoryProvider {
-    let mut initial = PartialPersistentRuntime::open(checked, MemoryProvider::default())
-        .expect("fresh partial runtime should open");
-    initial.run_action("seed").expect("seed should publish");
-    initial.into_provider()
+    let provider = restarted.into_provider();
+    assert_eq!(
+        provider.loads,
+        vec![foreign_key],
+        "post-destroy observation should materialize only the surviving foreign Folder"
+    );
 }
