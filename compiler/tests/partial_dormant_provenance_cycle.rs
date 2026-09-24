@@ -65,6 +65,61 @@ action readGrandchildName {
 }
 "#;
 
+const STAGED_SOURCE: &str = r#"
+state model Folder {
+    state name = ""
+    state folders: [live Folder] = []
+}
+
+state model Workspace {
+    state folders: [live Folder] = []
+}
+
+state workspace: Workspace
+state sourceFolder: maybe live Folder = none
+state destinationFolder: maybe live Folder = none
+state selectedChild: maybe live Folder = none
+state candidateDestination: maybe live Folder = none
+
+action seed {
+    create Folder in workspace as source {
+        through source.name = "Source"
+        insert source into workspace.folders
+    }
+    create Folder in workspace as destination {
+        through destination.name = "Destination"
+        insert destination into workspace.folders
+    }
+    sourceFolder = workspace.folders[0]
+    destinationFolder = workspace.folders[1]
+
+    create Folder in sourceFolder as child {
+        through child.name = "Child"
+        insert child into sourceFolder.folders
+    }
+    selectedChild = sourceFolder.folders[0]
+
+    create Folder in destinationFolder as candidate {
+        through candidate.name = "Candidate"
+        insert candidate into destinationFolder.folders
+    }
+    candidateDestination = destinationFolder.folders[0]
+}
+
+action attemptStagedCycle {
+    transfer candidateDestination from destinationFolder to selectedChild
+    transfer selectedChild from sourceFolder to candidateDestination
+}
+
+action proveSourceStillOwnsChild {
+    transfer selectedChild from sourceFolder to sourceFolder
+}
+
+action proveDestinationStillOwnsCandidate {
+    transfer candidateDestination from destinationFolder to destinationFolder
+}
+"#;
+
 #[derive(Debug, Clone, Default)]
 struct MemoryProvider {
     manifest: Option<Vec<u8>>,
@@ -190,5 +245,66 @@ fn dormant_provenance_cycle_is_rejected_without_member_backing_reads() {
     assert_eq!(
         restarted.value("observedName").unwrap(),
         Value::String("Grandchild".into())
+    );
+}
+
+#[test]
+fn dormant_cycle_check_observes_staged_provenance_and_rolls_back() {
+    let checked = check_source_with_runtime_models(STAGED_SOURCE)
+        .expect("staged dormant provenance-cycle pressure source should check");
+    let mut initial = PartialPersistentRuntime::open(checked.clone(), MemoryProvider::default())
+        .expect("fresh partial runtime should open");
+    initial.run_action("seed").expect("seed should publish");
+
+    let mut provider = initial.into_provider();
+    provider.loads.clear();
+    provider.replacements.clear();
+    let manifest_before = provider.manifest.clone();
+    let backing_before = provider.backing.clone();
+    assert_eq!(
+        backing_before.len(),
+        4,
+        "seed should produce two roots plus child and candidate Folder backing"
+    );
+
+    let mut runtime = PartialPersistentRuntime::open(checked.clone(), provider)
+        .expect("restart should leave the complete staged-cycle world dormant");
+    assert_eq!(runtime.dormant_backing_keys().len(), 4);
+
+    let error = runtime
+        .run_action("attemptStagedCycle")
+        .expect_err("second transfer must see the first staged owner edge and reject the cycle");
+    assert!(
+        error.message.contains("would create an owner cycle"),
+        "failure should be the established staged provenance-cycle diagnostic: {}",
+        error.message
+    );
+
+    let mut provider = runtime.into_provider();
+    assert_eq!(provider.manifest, manifest_before);
+    assert_eq!(provider.backing, backing_before);
+    assert!(
+        provider.loads.is_empty(),
+        "staged cycle validation and rollback should require no member backing reads"
+    );
+    assert!(
+        provider.replacements.is_empty(),
+        "failed staged cycle must never reach durable publication"
+    );
+
+    provider.loads.clear();
+    let mut restarted = PartialPersistentRuntime::open(checked, provider)
+        .expect("failed staged cycle must leave prior durable provenance restartable");
+    restarted
+        .run_action("proveSourceStillOwnsChild")
+        .expect("rollback must restore the child's original source owner");
+    restarted
+        .run_action("proveDestinationStillOwnsCandidate")
+        .expect("rollback must restore the candidate's original destination owner");
+
+    let provider = restarted.into_provider();
+    assert!(
+        provider.loads.is_empty(),
+        "post-rollback provenance proofs should remain metadata-only"
     );
 }
