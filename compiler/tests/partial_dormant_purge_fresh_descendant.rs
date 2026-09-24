@@ -92,7 +92,11 @@ fn fresh_transaction_local_descendant_blocks_dormant_purge_without_parent_read()
     provider.replacements.clear();
     let manifest_before = provider.manifest.clone();
     let backing_before = provider.backing.clone();
-    assert_eq!(backing_before.len(), 1, "seed should produce one root backing");
+    assert_eq!(
+        backing_before.len(),
+        1,
+        "seed should produce one root backing"
+    );
 
     let mut runtime = PartialPersistentRuntime::open(checked.clone(), provider)
         .expect("restart should leave the committed root dormant");
