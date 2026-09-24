@@ -106,7 +106,8 @@ impl PartialPersistenceProvider for MemoryProvider {
 }
 
 #[test]
-fn purge_clears_model_local_optional_designation_in_dormant_survivor_without_loading_doomed_payloads() {
+fn purge_clears_model_local_optional_designation_in_dormant_survivor_without_loading_doomed_payloads(
+) {
     let checked = check_source_with_runtime_models(SOURCE)
         .expect("dormant purge model-local optional cleanup source should check");
     let mut initial = PartialPersistentRuntime::open(checked.clone(), MemoryProvider::default())
@@ -180,7 +181,9 @@ fn purge_clears_model_local_optional_designation_in_dormant_survivor_without_loa
     );
     let error = restarted
         .materialize_designation("observedPinned")
-        .expect_err("purged grandchild must leave the copied model-local optional designation absent");
+        .expect_err(
+            "purged grandchild must leave the copied model-local optional designation absent",
+        );
     assert!(
         error.message.contains("has no target"),
         "model-local optional designation must not retain a purged identity: {}",
