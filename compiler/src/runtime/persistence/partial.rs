@@ -4,7 +4,8 @@ use super::*;
 
 const MANIFEST_MAGIC: &[u8; 8] = b"ELANUPRT";
 const BACKING_MAGIC: &[u8; 8] = b"ELANUBAK";
-const FORMAT_VERSION: u32 = 1;
+const MANIFEST_FORMAT_VERSION: u32 = 2;
+const BACKING_FORMAT_VERSION: u32 = 1;
 
 /// Host boundary for partially resident durable Elanu state.
 ///
@@ -27,6 +28,7 @@ struct BackingHandle {
     model_name: String,
     owner: String,
     token: u64,
+    structural_targets: HashSet<String>,
     resident_baseline: Option<Vec<u8>>,
 }
 
@@ -259,6 +261,12 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
             .load_backing(key)?
             .ok_or_else(|| RuntimeError::new("missing partial-persistence backing payload"))?;
         let values = decode_backing(&self.checked, &identity, &handle, &payload)?;
+        let structural_targets = structural_targets_from_values(&self.checked, &handle, &values)?;
+        if structural_targets != handle.structural_targets {
+            return Err(RuntimeError::new(format!(
+                "partial-persistence structural summary for '{identity}' does not match backing"
+            )));
+        }
         install_member_values(
             &self.checked,
             &mut self.runtime,
@@ -301,6 +309,7 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
             }
         };
 
+        let terminated_model_identities = transaction.terminated_model_identities.clone();
         let candidate_next_dynamic_identity = self.runtime.next_dynamic_identity;
         let mut candidate =
             restore_candidate_runtime(&self.checked, &self.shape, &prior_partial, &prior_backed)?;
@@ -315,9 +324,19 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
             &mut candidate_next_backing_token,
         )?;
 
+        let mut replacements = Vec::new();
+        if let Err(error) = self.rewrite_dormant_structural_cleanup(
+            &candidate,
+            &mut candidate_backed,
+            &terminated_model_identities,
+            &mut replacements,
+        ) {
+            self.runtime.next_dynamic_identity = prior_next_dynamic_identity;
+            return Err(error);
+        }
+
         let candidate_partial =
             capture_partial_image(&self.checked, &candidate, &self.shape, &candidate_backed)?;
-        let mut replacements = Vec::new();
         let mut identities = candidate_backed.keys().cloned().collect::<Vec<_>>();
         identities.sort();
         for identity in identities {
@@ -328,7 +347,10 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
                 .get(&identity)
                 .cloned()
                 .expect("candidate backing identity should still exist");
-            let payload = encode_runtime_backing(&self.checked, &candidate, &identity, &handle)?;
+            let values = runtime_backing_values(&self.checked, &candidate, &identity, &handle)?;
+            let payload = encode_backing_values(&self.checked, &identity, &handle, &values)?;
+            let structural_targets =
+                structural_targets_from_values(&self.checked, &handle, &values)?;
             let changed = handle
                 .resident_baseline
                 .as_ref()
@@ -337,10 +359,11 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
             if changed {
                 replacements.push((encode_key(handle.token), payload.clone()));
             }
-            candidate_backed
+            let candidate_handle = candidate_backed
                 .get_mut(&identity)
-                .expect("candidate backing identity should still exist")
-                .resident_baseline = Some(payload);
+                .expect("candidate backing identity should still exist");
+            candidate_handle.structural_targets = structural_targets;
+            candidate_handle.resident_baseline = Some(payload);
         }
 
         let manifest = encode_manifest(
@@ -356,6 +379,88 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
         self.runtime = candidate;
         self.backed = candidate_backed;
         self.next_backing_token = candidate_next_backing_token;
+        Ok(())
+    }
+
+    fn rewrite_dormant_structural_cleanup(
+        &mut self,
+        candidate: &Runtime,
+        candidate_backed: &mut HashMap<String, BackingHandle>,
+        terminated_model_identities: &HashSet<String>,
+        replacements: &mut Vec<(Vec<u8>, Vec<u8>)>,
+    ) -> Result<(), RuntimeError> {
+        if terminated_model_identities.is_empty() {
+            return Ok(());
+        }
+
+        let mut affected = candidate_backed
+            .iter()
+            .filter(|(identity, handle)| {
+                !identity_is_resident(&self.checked, candidate, identity)
+                    && !handle
+                        .structural_targets
+                        .is_disjoint(terminated_model_identities)
+            })
+            .map(|(identity, _)| identity.clone())
+            .collect::<Vec<_>>();
+        affected.sort();
+
+        for identity in affected {
+            let handle = candidate_backed
+                .get(&identity)
+                .cloned()
+                .expect("affected dormant identity should remain backed");
+            let key = encode_key(handle.token);
+            let payload = self
+                .provider
+                .load_backing(&key)?
+                .ok_or_else(|| RuntimeError::new("missing partial-persistence backing payload"))?;
+            let mut values = decode_backing(&self.checked, &identity, &handle, &payload)?;
+            let prior_targets = structural_targets_from_values(&self.checked, &handle, &values)?;
+            if prior_targets != handle.structural_targets {
+                return Err(RuntimeError::new(format!(
+                    "partial-persistence structural summary for '{identity}' does not match backing"
+                )));
+            }
+
+            let mut changed = false;
+            for member in stored_members(&self.checked, &handle)? {
+                if !matches!(&member.value_type, ValueType::SequenceLive(_)) {
+                    continue;
+                }
+                let value = values.get_mut(&member.name).ok_or_else(|| {
+                    RuntimeError::new(format!(
+                        "backing payload is missing '{identity}.{}'",
+                        member.name
+                    ))
+                })?;
+                let Value::Sequence { targets, .. } = value else {
+                    return Err(RuntimeError::new(format!(
+                        "backing payload member '{identity}.{}' is not structural membership",
+                        member.name
+                    )));
+                };
+                let before = targets.len();
+                targets.retain(|target| !terminated_model_identities.contains(target));
+                changed |= targets.len() != before;
+            }
+
+            if !changed {
+                return Err(RuntimeError::new(format!(
+                    "partial-persistence structural summary for '{identity}' reported terminated membership absent from backing"
+                )));
+            }
+
+            let structural_targets =
+                structural_targets_from_values(&self.checked, &handle, &values)?;
+            let replacement = encode_backing_values(&self.checked, &identity, &handle, &values)?;
+            replacements.push((key, replacement));
+            candidate_backed
+                .get_mut(&identity)
+                .expect("affected dormant identity should remain backed")
+                .structural_targets = structural_targets;
+        }
+
         Ok(())
     }
 
@@ -391,7 +496,7 @@ fn encode_manifest(
     let partial_bytes = partial.encode()?;
     let mut encoder = PersistenceEncoder::default();
     encoder.raw(MANIFEST_MAGIC);
-    encoder.u32(FORMAT_VERSION);
+    encoder.u32(MANIFEST_FORMAT_VERSION);
     encoder.len(partial_bytes.len())?;
     encoder.raw(&partial_bytes);
     encoder.u64(next_backing_token);
@@ -407,6 +512,12 @@ fn encode_manifest(
         encoder.string(&handle.model_name)?;
         encoder.string(&handle.owner)?;
         encoder.u64(handle.token);
+        let mut structural_targets = handle.structural_targets.iter().collect::<Vec<_>>();
+        structural_targets.sort();
+        encoder.len(structural_targets.len())?;
+        for target in structural_targets {
+            encoder.string(target)?;
+        }
     }
     Ok(encoder.finish())
 }
@@ -421,7 +532,7 @@ fn decode_manifest(
         ));
     }
     let version = decoder.u32()?;
-    if version != FORMAT_VERSION {
+    if version != MANIFEST_FORMAT_VERSION {
         return Err(RuntimeError::new(format!(
             "unsupported partial-persistence manifest version {version}"
         )));
@@ -435,10 +546,24 @@ fn decode_manifest(
     let mut tokens = HashSet::new();
     for _ in 0..count {
         let identity = decoder.string()?;
+        let model_name = decoder.string()?;
+        let owner = decoder.string()?;
+        let token = decoder.u64()?;
+        let structural_count = decoder.len()?;
+        let mut structural_targets = HashSet::new();
+        for _ in 0..structural_count {
+            let target = decoder.string()?;
+            if !structural_targets.insert(target.clone()) {
+                return Err(RuntimeError::new(format!(
+                    "partial-persistence manifest repeats structural target '{target}' for '{identity}'"
+                )));
+            }
+        }
         let handle = BackingHandle {
-            model_name: decoder.string()?,
-            owner: decoder.string()?,
-            token: decoder.u64()?,
+            model_name,
+            owner,
+            token,
+            structural_targets,
             resident_baseline: None,
         };
         if !tokens.insert(handle.token) {
@@ -492,12 +617,12 @@ fn identity_is_resident(checked: &CheckedSource, runtime: &Runtime, identity: &s
     })
 }
 
-fn encode_runtime_backing(
+fn runtime_backing_values(
     checked: &CheckedSource,
     runtime: &Runtime,
     identity: &str,
     handle: &BackingHandle,
-) -> Result<Vec<u8>, RuntimeError> {
+) -> Result<HashMap<String, Value>, RuntimeError> {
     let mut values = HashMap::new();
     for member in stored_members(checked, handle)? {
         let name = model_binding_name(identity, &member.name);
@@ -513,7 +638,34 @@ fn encode_runtime_backing(
             })?;
         values.insert(member.name.clone(), value);
     }
-    encode_backing_values(checked, identity, handle, &values)
+    Ok(values)
+}
+
+fn structural_targets_from_values(
+    checked: &CheckedSource,
+    handle: &BackingHandle,
+    values: &HashMap<String, Value>,
+) -> Result<HashSet<String>, RuntimeError> {
+    let mut structural_targets = HashSet::new();
+    for member in stored_members(checked, handle)? {
+        if !matches!(&member.value_type, ValueType::SequenceLive(_)) {
+            continue;
+        }
+        let value = values.get(&member.name).ok_or_else(|| {
+            RuntimeError::new(format!(
+                "backing payload is missing stored structural member '{}'",
+                member.name
+            ))
+        })?;
+        let Value::Sequence { targets, .. } = value else {
+            return Err(RuntimeError::new(format!(
+                "backing payload stored member '{}' is not structural membership",
+                member.name
+            )));
+        };
+        structural_targets.extend(targets.iter().cloned());
+    }
+    Ok(structural_targets)
 }
 
 fn encode_backing_values(
@@ -525,7 +677,7 @@ fn encode_backing_values(
     let members = stored_members(checked, handle)?;
     let mut encoder = PersistenceEncoder::default();
     encoder.raw(BACKING_MAGIC);
-    encoder.u32(FORMAT_VERSION);
+    encoder.u32(BACKING_FORMAT_VERSION);
     encoder.u64(handle.token);
     encoder.string(identity)?;
     encoder.string(&handle.model_name)?;
@@ -555,7 +707,7 @@ fn decode_backing(
         ));
     }
     let version = decoder.u32()?;
-    if version != FORMAT_VERSION {
+    if version != BACKING_FORMAT_VERSION {
         return Err(RuntimeError::new(format!(
             "unsupported partial-persistence backing version {version}"
         )));
@@ -747,6 +899,12 @@ fn restore_candidate_runtime(
             .expect("candidate backed identity should exist");
         if let Some(payload) = &handle.resident_baseline {
             let values = decode_backing(checked, &identity, handle, payload)?;
+            let structural_targets = structural_targets_from_values(checked, handle, &values)?;
+            if structural_targets != handle.structural_targets {
+                return Err(RuntimeError::new(format!(
+                    "partial-persistence structural summary for '{identity}' does not match resident baseline"
+                )));
+            }
             install_member_values(checked, &mut runtime, &identity, handle, &values)?;
         }
     }
@@ -793,6 +951,7 @@ fn synchronize_backing_handles(
                     model_name,
                     owner,
                     token,
+                    structural_targets: HashSet::new(),
                     resident_baseline: None,
                 },
             );
