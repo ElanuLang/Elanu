@@ -11,6 +11,7 @@ use elanu_compiler::{
 const SOURCE: &str = r#"
 state model Node {
     state name = ""
+    state children: [live Node] = []
 }
 
 state left: Node
