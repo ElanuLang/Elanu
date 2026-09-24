@@ -191,7 +191,7 @@ fn nonleaf_remembered_parent_restore_leaves_descendant_dormant_and_untouched() {
 
     provider.loads.clear();
     provider.replacements.clear();
-    let mut restarted = PartialPersistentRuntime::open(checked, provider)
+    let mut restarted = PartialPersistentRuntime::open(checked.clone(), provider)
         .expect("restored non-leaf world should restart dormant");
     assert_eq!(restarted.dormant_backing_keys().len(), 4);
 
