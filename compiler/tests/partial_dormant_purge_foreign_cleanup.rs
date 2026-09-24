@@ -180,9 +180,9 @@ fn purge_rewrites_only_surviving_dormant_foreign_owner_backing() {
     restarted
         .materialize_designation("foreign")
         .expect("surviving foreign owner should remain explicitly materializable");
-    let error = restarted
-        .run_action("selectForeignChild")
-        .expect_err("purged child and grandchild occurrences must be absent from foreign membership");
+    let error = restarted.run_action("selectForeignChild").expect_err(
+        "purged child and grandchild occurrences must be absent from foreign membership",
+    );
     assert!(
         error.message.contains("out of bounds"),
         "foreign membership should be empty after purge cleanup: {}",
