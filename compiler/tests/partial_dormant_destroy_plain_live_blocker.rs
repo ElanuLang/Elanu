@@ -92,7 +92,11 @@ fn plain_live_designation_blocks_dormant_leaf_destroy_without_materialization() 
     provider.replacements.clear();
     let manifest_before = provider.manifest.clone();
     let backing_before = provider.backing.clone();
-    assert_eq!(backing_before.len(), 1, "seed should produce one child backing");
+    assert_eq!(
+        backing_before.len(),
+        1,
+        "seed should produce one child backing"
+    );
 
     let mut runtime = PartialPersistentRuntime::open(checked.clone(), provider)
         .expect("restart should leave the child dormant");
