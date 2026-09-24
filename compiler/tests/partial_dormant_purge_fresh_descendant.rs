@@ -20,8 +20,8 @@ state observedName = ""
 action seed {
     create Node in left as rootNode {
         through rootNode.name = "Committed root"
+        root = rootNode
     }
-    root = left
 }
 
 action createFreshThenPurge {
