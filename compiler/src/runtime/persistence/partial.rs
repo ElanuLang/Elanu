@@ -349,7 +349,8 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
                 .expect("candidate backing identity should still exist");
             let values = runtime_backing_values(&self.checked, &candidate, &identity, &handle)?;
             let payload = encode_backing_values(&self.checked, &identity, &handle, &values)?;
-            let structural_targets = structural_targets_from_values(&self.checked, &handle, &values)?;
+            let structural_targets =
+                structural_targets_from_values(&self.checked, &handle, &values)?;
             let changed = handle
                 .resident_baseline
                 .as_ref()
@@ -424,7 +425,7 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
 
             let mut changed = false;
             for member in stored_members(&self.checked, &handle)? {
-                if !matches!(member.value_type, ValueType::SequenceLive(_)) {
+                if !matches!(&member.value_type, ValueType::SequenceLive(_)) {
                     continue;
                 }
                 let value = values.get_mut(&member.name).ok_or_else(|| {
@@ -450,7 +451,8 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
                 )));
             }
 
-            let structural_targets = structural_targets_from_values(&self.checked, &handle, &values)?;
+            let structural_targets =
+                structural_targets_from_values(&self.checked, &handle, &values)?;
             let replacement = encode_backing_values(&self.checked, &identity, &handle, &values)?;
             replacements.push((key, replacement));
             candidate_backed
@@ -639,16 +641,6 @@ fn runtime_backing_values(
     Ok(values)
 }
 
-fn encode_runtime_backing(
-    checked: &CheckedSource,
-    runtime: &Runtime,
-    identity: &str,
-    handle: &BackingHandle,
-) -> Result<Vec<u8>, RuntimeError> {
-    let values = runtime_backing_values(checked, runtime, identity, handle)?;
-    encode_backing_values(checked, identity, handle, &values)
-}
-
 fn structural_targets_from_values(
     checked: &CheckedSource,
     handle: &BackingHandle,
@@ -656,7 +648,7 @@ fn structural_targets_from_values(
 ) -> Result<HashSet<String>, RuntimeError> {
     let mut structural_targets = HashSet::new();
     for member in stored_members(checked, handle)? {
-        if !matches!(member.value_type, ValueType::SequenceLive(_)) {
+        if !matches!(&member.value_type, ValueType::SequenceLive(_)) {
             continue;
         }
         let value = values.get(&member.name).ok_or_else(|| {
