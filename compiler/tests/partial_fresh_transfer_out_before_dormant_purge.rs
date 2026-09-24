@@ -28,23 +28,19 @@ action seed {
 
 action createTransferOutThenPurge {
     create Node in root as freshNode {
-        through freshNode.name = "Fresh survivor"
+        through freshNode.name = "Fresh candidate"
         fresh = freshNode
     }
     transfer fresh from root to right
     purge root in left
 }
 
-action proveRightOwnsFresh {
-    transfer fresh from right to right
-}
-
-action proveRootStillLive {
+action proveLeftOwnsRoot {
     transfer root from left to left
 }
 
-action readFreshName {
-    observedName = fresh.name
+action readRootName {
+    observedName = root.name
 }
 "#;
 
@@ -88,9 +84,9 @@ impl PartialPersistenceProvider for MemoryProvider {
 }
 
 #[test]
-fn fresh_transfer_out_removes_dormant_purge_blocker_and_publishes_survivor() {
+fn persisted_fresh_designation_does_not_bypass_committed_only_transfer_law() {
     let checked = check_source_with_runtime_models(SOURCE)
-        .expect("fresh transfer-out dormant purge pressure source should check");
+        .expect("fresh designation plus transfer source should remain compiler-accepted");
     let mut initial = PartialPersistentRuntime::open(checked.clone(), MemoryProvider::default())
         .expect("fresh partial runtime should open");
     initial.run_action("seed").expect("seed should publish");
@@ -98,92 +94,82 @@ fn fresh_transfer_out_removes_dormant_purge_blocker_and_publishes_survivor() {
     let mut provider = initial.into_provider();
     provider.loads.clear();
     provider.replacements.clear();
+    let manifest_before = provider.manifest.clone();
+    let backing_before = provider.backing.clone();
     assert_eq!(
-        provider.backing.len(),
+        backing_before.len(),
         1,
         "seed should produce only committed-root backing"
     );
 
     let mut runtime = PartialPersistentRuntime::open(checked.clone(), provider)
         .expect("restart should leave the committed root dormant");
-    let root_keys = runtime.dormant_backing_keys();
-    assert_eq!(root_keys.len(), 1);
-    let root_key = root_keys[0].clone();
+    assert_eq!(runtime.dormant_backing_keys().len(), 1);
 
-    runtime
+    let error = runtime
         .run_action("createTransferOutThenPurge")
-        .expect("fresh child transferred out before purge should survive and commit");
+        .expect_err("fresh transaction-local children are not transfer targets");
+    assert!(
+        error
+            .message
+            .contains("requires an existing committed dynamic child"),
+        "failure should preserve the committed-only transfer law: {}",
+        error.message
+    );
+    assert_eq!(
+        runtime.dormant_backing_keys().len(),
+        1,
+        "failed transfer must roll back the fresh identity completely"
+    );
 
-    let mut provider = runtime.into_provider();
+    let provider = runtime.into_provider();
+    assert_eq!(provider.manifest, manifest_before);
+    assert_eq!(provider.backing, backing_before);
     assert!(
         provider.loads.is_empty(),
-        "create, transfer, and purge should not materialize the dormant committed root"
+        "committed-only transfer validation should not materialize the dormant source owner"
     );
-    assert_eq!(
-        provider.replacements.len(),
-        1,
-        "accepted action should publish one durable candidate"
-    );
-    assert_eq!(
-        provider.replacements[0].len(),
-        1,
-        "only the fresh surviving identity should need new backing publication"
-    );
-    let fresh_key = provider.replacements[0][0].clone();
-    assert_ne!(
-        fresh_key, root_key,
-        "fresh survivor must receive its own backing rather than overwrite the retired root"
-    );
-    assert_eq!(
-        provider.backing.len(),
-        2,
-        "retired root bytes may remain physically present beside fresh survivor backing"
+    assert!(
+        provider.replacements.is_empty(),
+        "failed fresh transfer must not attempt durable publication"
     );
 
+    let mut proof_provider = provider.clone();
+    proof_provider.loads.clear();
+    proof_provider.replacements.clear();
+    let mut proof = PartialPersistentRuntime::open(checked.clone(), proof_provider)
+        .expect("failed fresh transfer must leave the prior durable world restartable");
+    proof
+        .run_action("proveLeftOwnsRoot")
+        .expect("committed root provenance must survive the failed action");
+    proof
+        .materialize_designation("fresh")
+        .expect_err("fresh designation assignment must roll back to absence");
+    assert!(
+        proof.into_provider().loads.is_empty(),
+        "metadata proof and absent fresh designation should require no backing read"
+    );
+
+    let mut provider = provider;
     provider.loads.clear();
     provider.replacements.clear();
     let mut restarted = PartialPersistentRuntime::open(checked, provider)
-        .expect("accepted fresh-transfer-and-purge world should restart");
-    assert_eq!(
-        restarted.dormant_backing_keys(),
-        vec![fresh_key.clone()],
-        "only the fresh survivor should remain a live dormant modeled identity"
-    );
+        .expect("prior committed root world should remain restartable");
     restarted
-        .run_action("proveRightOwnsFresh")
-        .expect("fresh survivor should commit under its transferred right owner");
+        .materialize_designation("root")
+        .expect("committed root should remain explicitly materializable");
     restarted
-        .run_action("proveRootStillLive")
-        .expect_err("purged root must no longer provide a live target after restart");
-
-    let mut provider = restarted.into_provider();
-    assert!(
-        provider.loads.is_empty(),
-        "post-restart provenance proofs should remain metadata-only"
-    );
-    provider.loads.clear();
-    provider.replacements.clear();
-
-    let mut restarted = PartialPersistentRuntime::open(
-        check_source_with_runtime_models(SOURCE).expect("source should still check"),
-        provider,
-    )
-    .expect("fresh survivor world should remain restartable");
-    restarted
-        .materialize_designation("fresh")
-        .expect("fresh survivor should be explicitly materializable after restart");
-    restarted
-        .run_action("readFreshName")
-        .expect("fresh survivor payload should remain intact");
+        .run_action("readRootName")
+        .expect("failed fresh transfer must preserve committed root payload");
     assert_eq!(
         restarted.value("observedName").unwrap(),
-        Value::String("Fresh survivor".into())
+        Value::String("Committed root".into())
     );
 
     let provider = restarted.into_provider();
     assert_eq!(
-        provider.loads,
-        vec![fresh_key],
-        "only explicit later fresh-survivor materialization should read backing"
+        provider.loads.len(),
+        1,
+        "only later explicit root materialization should read backing"
     );
 }
