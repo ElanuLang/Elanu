@@ -205,8 +205,14 @@ fn nonleaf_remembered_parent_restore_leaves_descendant_dormant_and_untouched() {
         .materialize_designation("selectedFolder")
         .expect("selected root should remain materializable");
 
-    assert_eq!(restarted.value("selectedInSource").unwrap(), Value::Bool(true));
-    assert_eq!(restarted.value("selectedInTrash").unwrap(), Value::Bool(false));
+    assert_eq!(
+        restarted.value("selectedInSource").unwrap(),
+        Value::Bool(true)
+    );
+    assert_eq!(
+        restarted.value("selectedInTrash").unwrap(),
+        Value::Bool(false)
+    );
     restarted
         .run_action("proveSelectedOwner")
         .expect("source should again prove selected root provenance");
