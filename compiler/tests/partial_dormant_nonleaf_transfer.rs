@@ -46,13 +46,13 @@ action seed {
     create Folder in sourceFolder as child {
         through child.name = "Child"
         insert child into sourceFolder.folders
-
-        create Document in child as document {
-            through document.title = "Descendant"
-            insert document into child.documents
-        }
     }
     selectedChild = sourceFolder.folders[0]
+
+    create Document in selectedChild as document {
+        through document.title = "Descendant"
+        insert document into selectedChild.documents
+    }
     selectedDocument = selectedChild.documents[0]
 }
 
