@@ -190,9 +190,9 @@ fn transfer_dormant_nonleaf_changes_only_parent_provenance_edge() {
     restarted
         .run_action("proveSourceOwnsChild")
         .expect_err("old owner must no longer prove transferred child provenance");
-    restarted
-        .run_action("proveChildStillOwnsDocument")
-        .expect("descendant provenance edge must remain unchanged while both identities are dormant");
+    restarted.run_action("proveChildStillOwnsDocument").expect(
+        "descendant provenance edge must remain unchanged while both identities are dormant",
+    );
     restarted
         .run_action("proveDestinationDoesNotOwnDocument")
         .expect_err("transferring the parent must not migrate descendant provenance");
