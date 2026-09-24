@@ -44,6 +44,7 @@ action seed {
         insert document into selectedFolder.documents
     }
     selectedDocument = selectedFolder.documents[0]
+    insert selectedDocument into otherFolder.documents
     through otherFolder.pinnedDocument = selectedDocument
 }
 
@@ -53,6 +54,10 @@ action destroySelected {
 
 action inspectPinned {
     observedPinned = otherFolder.pinnedDocument
+}
+
+action inspectMembership {
+    observedPinned = otherFolder.documents[0]
 }
 "#;
 
@@ -89,9 +94,9 @@ impl PartialPersistenceProvider for MemoryProvider {
 }
 
 #[test]
-fn destroy_must_clear_model_local_optional_designation_owned_by_dormant_foreign_folder() {
+fn destroy_cleans_all_termination_relations_owned_by_dormant_foreign_folder() {
     let checked = check_source_with_runtime_models(SOURCE)
-        .expect("dormant model-local designation pressure source should check");
+        .expect("dormant termination-cleanup pressure source should check");
     let mut initial = PartialPersistentRuntime::open(checked.clone(), MemoryProvider::default())
         .expect("fresh partial runtime should open");
     initial.run_action("seed").expect("seed should publish");
@@ -111,7 +116,7 @@ fn destroy_must_clear_model_local_optional_designation_owned_by_dormant_foreign_
         .expect("lifetime-owner Folder should materialize");
     runtime
         .run_action("destroySelected")
-        .expect("destroy should satisfy model-local optional-designation cleanup");
+        .expect("destroy should satisfy every established dormant cleanup relation");
     let dormant = runtime.dormant_backing_keys();
     assert_eq!(
         dormant.len(),
@@ -121,12 +126,26 @@ fn destroy_must_clear_model_local_optional_designation_owned_by_dormant_foreign_
     let foreign_key = dormant[0].clone();
 
     let mut provider = runtime.into_provider();
+    assert_eq!(
+        provider.loads.len(),
+        2,
+        "only the explicitly materialized owner and the affected dormant foreign Folder should be read"
+    );
+    assert_eq!(
+        provider.loads.last(),
+        Some(&foreign_key),
+        "termination publication should privately rewrite the still-dormant foreign Folder"
+    );
     provider.loads.clear();
+
     let mut restarted = PartialPersistentRuntime::open(checked, provider)
         .expect("published post-destroy world should restart");
     restarted
         .materialize_designation("otherFolder")
         .expect("foreign Folder should remain live and independently materializable");
+    restarted
+        .run_action("inspectMembership")
+        .expect_err("terminated target must be removed from dormant structural membership");
     restarted
         .run_action("inspectPinned")
         .expect("cleared model-local optional designation should copy as none");
