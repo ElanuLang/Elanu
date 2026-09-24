@@ -286,9 +286,9 @@ fn rejected_dormant_nonleaf_transfer_preserves_prior_provenance_and_retries() {
     restarted
         .run_action("proveDestinationOwnsChild")
         .expect_err("rejected transfer must not publish the destination owner");
-    restarted.run_action("proveChildStillOwnsDocument").expect(
-        "rejected parent transfer must preserve the descendant provenance edge",
-    );
+    restarted
+        .run_action("proveChildStillOwnsDocument")
+        .expect("rejected parent transfer must preserve the descendant provenance edge");
     assert!(
         restarted.into_provider().loads.is_empty(),
         "provenance verification after rejection must not materialize dormant backing"
