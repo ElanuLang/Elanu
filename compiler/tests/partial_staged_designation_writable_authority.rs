@@ -102,7 +102,11 @@ fn staged_designation_retargeting_drives_writable_authority_at_grant_time() {
     let mut provider = initial.into_provider();
     provider.loads.clear();
     provider.replacements.clear();
-    assert_eq!(provider.backing.len(), 2, "seed should produce two document backings");
+    assert_eq!(
+        provider.backing.len(),
+        2,
+        "seed should produce two document backings"
+    );
 
     let mut runtime = PartialPersistentRuntime::open(checked.clone(), provider)
         .expect("restart should leave both documents dormant");
@@ -132,7 +136,10 @@ fn staged_designation_retargeting_drives_writable_authority_at_grant_time() {
     );
     let first_key = provider.loads[0].clone();
     let second_key = provider.loads[1].clone();
-    assert_ne!(first_key, second_key, "the two children must have distinct backing identities");
+    assert_ne!(
+        first_key, second_key,
+        "the two children must have distinct backing identities"
+    );
     assert_eq!(
         provider.replacements,
         vec![vec![second_key.clone()]],
