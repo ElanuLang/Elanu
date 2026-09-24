@@ -61,6 +61,54 @@ action inspectMembership {
 }
 "#;
 
+const DESIGNATION_ONLY_SOURCE: &str = r#"
+state model Document {
+    state title = ""
+}
+
+state model Folder {
+    state documents: [live Document] = []
+    state pinnedDocument: maybe live Document = none
+}
+
+state model Workspace {
+    state folders: [live Folder] = []
+}
+
+state workspace: Workspace
+state selectedFolder: maybe live Folder = none
+state otherFolder: maybe live Folder = none
+state selectedDocument: maybe live Document = none
+state observedPinned: maybe live Document = none
+
+action seed {
+    create Folder in workspace as firstFolder {
+        insert firstFolder into workspace.folders
+    }
+    create Folder in workspace as secondFolder {
+        insert secondFolder into workspace.folders
+    }
+
+    selectedFolder = workspace.folders[0]
+    otherFolder = workspace.folders[1]
+
+    create Document in selectedFolder as document {
+        through document.title = "Pinned remotely"
+        insert document into selectedFolder.documents
+    }
+    selectedDocument = selectedFolder.documents[0]
+    through otherFolder.pinnedDocument = selectedDocument
+}
+
+action destroySelected {
+    destroy selectedDocument in selectedFolder
+}
+
+action inspectPinned {
+    observedPinned = otherFolder.pinnedDocument
+}
+"#;
+
 #[derive(Debug, Clone, Default)]
 struct MemoryProvider {
     manifest: Option<Vec<u8>>,
@@ -164,4 +212,51 @@ fn destroy_cleans_all_termination_relations_owned_by_dormant_foreign_folder() {
         vec![foreign_key],
         "post-destroy observation should materialize only the surviving foreign Folder"
     );
+}
+
+#[test]
+fn designation_only_target_selects_dormant_foreign_backing_for_cleanup() {
+    let checked = check_source_with_runtime_models(DESIGNATION_ONLY_SOURCE)
+        .expect("designation-only dormant cleanup source should check");
+    let mut initial = PartialPersistentRuntime::open(checked.clone(), MemoryProvider::default())
+        .expect("fresh partial runtime should open");
+    initial.run_action("seed").expect("seed should publish");
+
+    let mut provider = initial.into_provider();
+    provider.loads.clear();
+    let mut runtime = PartialPersistentRuntime::open(checked.clone(), provider)
+        .expect("restart should open without dynamic backing reads");
+    assert_eq!(runtime.dormant_backing_keys().len(), 3);
+
+    runtime
+        .materialize_root_member_index("workspace", "folders", 0)
+        .expect("lifetime-owner Folder should materialize");
+    runtime
+        .run_action("destroySelected")
+        .expect("designation-only dormant reference should be selected for cleanup");
+
+    let dormant = runtime.dormant_backing_keys();
+    assert_eq!(dormant.len(), 1);
+    let foreign_key = dormant[0].clone();
+    let mut provider = runtime.into_provider();
+    assert_eq!(
+        provider.loads.len(),
+        2,
+        "designation-only summary must select the foreign Folder in addition to explicit owner materialization"
+    );
+    assert_eq!(provider.loads.last(), Some(&foreign_key));
+    provider.loads.clear();
+
+    let mut restarted = PartialPersistentRuntime::open(checked, provider)
+        .expect("cleaned designation-only world should restart");
+    restarted
+        .materialize_designation("otherFolder")
+        .expect("foreign Folder should remain live");
+    restarted
+        .run_action("inspectPinned")
+        .expect("cleaned model-local optional designation should copy as none");
+    let error = restarted
+        .materialize_designation("observedPinned")
+        .expect_err("designation-only cleanup must leave the copied designation absent");
+    assert!(error.message.contains("has no target"));
 }
