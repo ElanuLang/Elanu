@@ -239,9 +239,9 @@ fn rejected_dormant_purge_preserves_foreign_backing_and_retries_atomically() {
     restarted
         .materialize_designation("foreign")
         .expect("foreign survivor should remain explicitly materializable");
-    let error = restarted.run_action("selectForeignChild").expect_err(
-        "accepted retry must publish the cleaned foreign membership",
-    );
+    let error = restarted
+        .run_action("selectForeignChild")
+        .expect_err("accepted retry must publish the cleaned foreign membership");
     assert!(
         error.message.contains("out of bounds"),
         "foreign membership should be empty after accepted retry: {}",
