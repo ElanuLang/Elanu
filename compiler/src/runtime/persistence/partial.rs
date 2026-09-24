@@ -4,7 +4,7 @@ use super::*;
 
 const MANIFEST_MAGIC: &[u8; 8] = b"ELANUPRT";
 const BACKING_MAGIC: &[u8; 8] = b"ELANUBAK";
-const MANIFEST_FORMAT_VERSION: u32 = 2;
+const MANIFEST_FORMAT_VERSION: u32 = 3;
 const BACKING_FORMAT_VERSION: u32 = 1;
 
 /// Host boundary for partially resident durable Elanu state.
@@ -28,7 +28,7 @@ struct BackingHandle {
     model_name: String,
     owner: String,
     token: u64,
-    structural_targets: HashSet<String>,
+    termination_cleanup_targets: HashSet<String>,
     resident_baseline: Option<Vec<u8>>,
 }
 
@@ -261,10 +261,11 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
             .load_backing(key)?
             .ok_or_else(|| RuntimeError::new("missing partial-persistence backing payload"))?;
         let values = decode_backing(&self.checked, &identity, &handle, &payload)?;
-        let structural_targets = structural_targets_from_values(&self.checked, &handle, &values)?;
-        if structural_targets != handle.structural_targets {
+        let termination_cleanup_targets =
+            termination_cleanup_targets_from_values(&self.checked, &handle, &values)?;
+        if termination_cleanup_targets != handle.termination_cleanup_targets {
             return Err(RuntimeError::new(format!(
-                "partial-persistence structural summary for '{identity}' does not match backing"
+                "partial-persistence termination-cleanup summary for '{identity}' does not match backing"
             )));
         }
         install_member_values(
@@ -325,7 +326,7 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
         )?;
 
         let mut replacements = Vec::new();
-        if let Err(error) = self.rewrite_dormant_structural_cleanup(
+        if let Err(error) = self.rewrite_dormant_termination_cleanup(
             &candidate,
             &mut candidate_backed,
             &terminated_model_identities,
@@ -349,8 +350,8 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
                 .expect("candidate backing identity should still exist");
             let values = runtime_backing_values(&self.checked, &candidate, &identity, &handle)?;
             let payload = encode_backing_values(&self.checked, &identity, &handle, &values)?;
-            let structural_targets =
-                structural_targets_from_values(&self.checked, &handle, &values)?;
+            let termination_cleanup_targets =
+                termination_cleanup_targets_from_values(&self.checked, &handle, &values)?;
             let changed = handle
                 .resident_baseline
                 .as_ref()
@@ -362,7 +363,7 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
             let candidate_handle = candidate_backed
                 .get_mut(&identity)
                 .expect("candidate backing identity should still exist");
-            candidate_handle.structural_targets = structural_targets;
+            candidate_handle.termination_cleanup_targets = termination_cleanup_targets;
             candidate_handle.resident_baseline = Some(payload);
         }
 
@@ -382,7 +383,7 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
         Ok(())
     }
 
-    fn rewrite_dormant_structural_cleanup(
+    fn rewrite_dormant_termination_cleanup(
         &mut self,
         candidate: &Runtime,
         candidate_backed: &mut HashMap<String, BackingHandle>,
@@ -398,7 +399,7 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
             .filter(|(identity, handle)| {
                 !identity_is_resident(&self.checked, candidate, identity)
                     && !handle
-                        .structural_targets
+                        .termination_cleanup_targets
                         .is_disjoint(terminated_model_identities)
             })
             .map(|(identity, _)| identity.clone())
@@ -416,49 +417,71 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
                 .load_backing(&key)?
                 .ok_or_else(|| RuntimeError::new("missing partial-persistence backing payload"))?;
             let mut values = decode_backing(&self.checked, &identity, &handle, &payload)?;
-            let prior_targets = structural_targets_from_values(&self.checked, &handle, &values)?;
-            if prior_targets != handle.structural_targets {
+            let prior_targets =
+                termination_cleanup_targets_from_values(&self.checked, &handle, &values)?;
+            if prior_targets != handle.termination_cleanup_targets {
                 return Err(RuntimeError::new(format!(
-                    "partial-persistence structural summary for '{identity}' does not match backing"
+                    "partial-persistence termination-cleanup summary for '{identity}' does not match backing"
                 )));
             }
 
             let mut changed = false;
             for member in stored_members(&self.checked, &handle)? {
-                if !matches!(&member.value_type, ValueType::SequenceLive(_)) {
-                    continue;
-                }
                 let value = values.get_mut(&member.name).ok_or_else(|| {
                     RuntimeError::new(format!(
                         "backing payload is missing '{identity}.{}'",
                         member.name
                     ))
                 })?;
-                let Value::Sequence { targets, .. } = value else {
-                    return Err(RuntimeError::new(format!(
-                        "backing payload member '{identity}.{}' is not structural membership",
-                        member.name
-                    )));
-                };
-                let before = targets.len();
-                targets.retain(|target| !terminated_model_identities.contains(target));
-                changed |= targets.len() != before;
+                if matches!(&member.value_type, ValueType::SequenceLive(_)) {
+                    let Value::Sequence { targets, .. } = value else {
+                        return Err(RuntimeError::new(format!(
+                            "backing payload member '{identity}.{}' is not structural membership",
+                            member.name
+                        )));
+                    };
+                    let before = targets.len();
+                    targets.retain(|target| !terminated_model_identities.contains(target));
+                    changed |= targets.len() != before;
+                    continue;
+                }
+                if member
+                    .designation
+                    .as_ref()
+                    .is_some_and(|designation| designation.allows_none)
+                {
+                    let Value::String(target) = value else {
+                        return Err(RuntimeError::new(format!(
+                            "backing payload member '{identity}.{}' is not an optional live designation",
+                            member.name
+                        )));
+                    };
+                    if !target.is_empty() && terminated_model_identities.contains(target) {
+                        target.clear();
+                        changed = true;
+                    }
+                }
             }
 
             if !changed {
                 return Err(RuntimeError::new(format!(
-                    "partial-persistence structural summary for '{identity}' reported terminated membership absent from backing"
+                    "partial-persistence termination-cleanup summary for '{identity}' reported a terminated target absent from backing"
                 )));
             }
 
-            let structural_targets =
-                structural_targets_from_values(&self.checked, &handle, &values)?;
+            let termination_cleanup_targets =
+                termination_cleanup_targets_from_values(&self.checked, &handle, &values)?;
+            if !termination_cleanup_targets.is_disjoint(terminated_model_identities) {
+                return Err(RuntimeError::new(format!(
+                    "partial-persistence termination cleanup for '{identity}' retained a terminated target"
+                )));
+            }
             let replacement = encode_backing_values(&self.checked, &identity, &handle, &values)?;
             replacements.push((key, replacement));
             candidate_backed
                 .get_mut(&identity)
                 .expect("affected dormant identity should remain backed")
-                .structural_targets = structural_targets;
+                .termination_cleanup_targets = termination_cleanup_targets;
         }
 
         Ok(())
@@ -512,10 +535,13 @@ fn encode_manifest(
         encoder.string(&handle.model_name)?;
         encoder.string(&handle.owner)?;
         encoder.u64(handle.token);
-        let mut structural_targets = handle.structural_targets.iter().collect::<Vec<_>>();
-        structural_targets.sort();
-        encoder.len(structural_targets.len())?;
-        for target in structural_targets {
+        let mut cleanup_targets = handle
+            .termination_cleanup_targets
+            .iter()
+            .collect::<Vec<_>>();
+        cleanup_targets.sort();
+        encoder.len(cleanup_targets.len())?;
+        for target in cleanup_targets {
             encoder.string(target)?;
         }
     }
@@ -549,13 +575,13 @@ fn decode_manifest(
         let model_name = decoder.string()?;
         let owner = decoder.string()?;
         let token = decoder.u64()?;
-        let structural_count = decoder.len()?;
-        let mut structural_targets = HashSet::new();
-        for _ in 0..structural_count {
+        let cleanup_count = decoder.len()?;
+        let mut termination_cleanup_targets = HashSet::new();
+        for _ in 0..cleanup_count {
             let target = decoder.string()?;
-            if !structural_targets.insert(target.clone()) {
+            if !termination_cleanup_targets.insert(target.clone()) {
                 return Err(RuntimeError::new(format!(
-                    "partial-persistence manifest repeats structural target '{target}' for '{identity}'"
+                    "partial-persistence manifest repeats termination-cleanup target '{target}' for '{identity}'"
                 )));
             }
         }
@@ -563,7 +589,7 @@ fn decode_manifest(
             model_name,
             owner,
             token,
-            structural_targets,
+            termination_cleanup_targets,
             resident_baseline: None,
         };
         if !tokens.insert(handle.token) {
@@ -641,31 +667,52 @@ fn runtime_backing_values(
     Ok(values)
 }
 
-fn structural_targets_from_values(
+fn termination_cleanup_targets_from_values(
     checked: &CheckedSource,
     handle: &BackingHandle,
     values: &HashMap<String, Value>,
 ) -> Result<HashSet<String>, RuntimeError> {
-    let mut structural_targets = HashSet::new();
+    let mut cleanup_targets = HashSet::new();
     for member in stored_members(checked, handle)? {
-        if !matches!(&member.value_type, ValueType::SequenceLive(_)) {
+        if matches!(&member.value_type, ValueType::SequenceLive(_)) {
+            let value = values.get(&member.name).ok_or_else(|| {
+                RuntimeError::new(format!(
+                    "backing payload is missing stored structural member '{}'",
+                    member.name
+                ))
+            })?;
+            let Value::Sequence { targets, .. } = value else {
+                return Err(RuntimeError::new(format!(
+                    "backing payload stored member '{}' is not structural membership",
+                    member.name
+                )));
+            };
+            cleanup_targets.extend(targets.iter().cloned());
             continue;
         }
-        let value = values.get(&member.name).ok_or_else(|| {
-            RuntimeError::new(format!(
-                "backing payload is missing stored structural member '{}'",
-                member.name
-            ))
-        })?;
-        let Value::Sequence { targets, .. } = value else {
-            return Err(RuntimeError::new(format!(
-                "backing payload stored member '{}' is not structural membership",
-                member.name
-            )));
-        };
-        structural_targets.extend(targets.iter().cloned());
+        if member
+            .designation
+            .as_ref()
+            .is_some_and(|designation| designation.allows_none)
+        {
+            let value = values.get(&member.name).ok_or_else(|| {
+                RuntimeError::new(format!(
+                    "backing payload is missing stored optional designation member '{}'",
+                    member.name
+                ))
+            })?;
+            let Value::String(target) = value else {
+                return Err(RuntimeError::new(format!(
+                    "backing payload stored member '{}' is not an optional live designation",
+                    member.name
+                )));
+            };
+            if !target.is_empty() {
+                cleanup_targets.insert(target.clone());
+            }
+        }
     }
-    Ok(structural_targets)
+    Ok(cleanup_targets)
 }
 
 fn encode_backing_values(
@@ -899,10 +946,11 @@ fn restore_candidate_runtime(
             .expect("candidate backed identity should exist");
         if let Some(payload) = &handle.resident_baseline {
             let values = decode_backing(checked, &identity, handle, payload)?;
-            let structural_targets = structural_targets_from_values(checked, handle, &values)?;
-            if structural_targets != handle.structural_targets {
+            let termination_cleanup_targets =
+                termination_cleanup_targets_from_values(checked, handle, &values)?;
+            if termination_cleanup_targets != handle.termination_cleanup_targets {
                 return Err(RuntimeError::new(format!(
-                    "partial-persistence structural summary for '{identity}' does not match resident baseline"
+                    "partial-persistence termination-cleanup summary for '{identity}' does not match resident baseline"
                 )));
             }
             install_member_values(checked, &mut runtime, &identity, handle, &values)?;
@@ -951,7 +999,7 @@ fn synchronize_backing_handles(
                     model_name,
                     owner,
                     token,
-                    structural_targets: HashSet::new(),
+                    termination_cleanup_targets: HashSet::new(),
                     resident_baseline: None,
                 },
             );
