@@ -101,7 +101,11 @@ fn writable_authority_through_materialized_designation_preserves_exact_member_an
     let mut provider = initial.into_provider();
     provider.loads.clear();
     provider.replacements.clear();
-    assert_eq!(provider.backing.len(), 2, "seed should produce two document backings");
+    assert_eq!(
+        provider.backing.len(),
+        2,
+        "seed should produce two document backings"
+    );
 
     let mut runtime = PartialPersistentRuntime::open(checked.clone(), provider)
         .expect("restart should leave both documents dormant");
@@ -116,50 +120,60 @@ fn writable_authority_through_materialized_designation_preserves_exact_member_an
         "unrelated sibling should remain dormant"
     );
 
-    let provider = runtime.into_provider();
-    assert_eq!(provider.loads.len(), 1, "explicit selected materialization should read one backing");
-    let selected_key = provider.loads[0].clone();
-
-    let mut runtime = PartialPersistentRuntime::open(checked.clone(), provider)
-        .expect("reopening after explicit materialization should restore the durable dormant world");
     runtime
-        .materialize_designation("selected")
-        .expect("selected target should materialize again for the authority action");
+        .run_action("renameSelected")
+        .expect("writable authority should target the already-materialized selected member");
+
     let mut provider = runtime.into_provider();
-    let second_materialization_key = provider
-        .loads
-        .last()
-        .cloned()
-        .expect("second selected materialization should record a backing read");
-    assert_eq!(second_materialization_key, selected_key);
-    provider.loads.clear();
-    provider.replacements.clear();
-
-    let mut runtime = PartialPersistentRuntime::open(checked.clone(), provider)
-        .expect("durable world should reopen before final authority run");
-    runtime
-        .materialize_designation("selected")
-        .expect("selected target must be resident before ordinary source execution");
-    let mut provider = runtime.into_provider();
-    assert_eq!(provider.loads, vec![selected_key.clone()]);
-    provider.loads.clear();
-    provider.replacements.clear();
-
-    let mut runtime = PartialPersistentRuntime::open(checked.clone(), provider)
-        .expect("final durable reopen should again leave both children dormant");
-    runtime
-        .materialize_designation("selected")
-        .expect("materialize selected immediately before authority grant");
-    let selected_key = runtime.into_provider().loads.last().cloned().unwrap();
-
-    let mut runtime = PartialPersistentRuntime::open(
-        checked.clone(),
-        {
-            let mut provider = MemoryProvider::default();
-            // This block is never reached with durable state and exists only to satisfy construction.
-            // Replaced below by the actual provider path.
-            provider
-        },
+    assert_eq!(
+        provider.loads.len(),
+        1,
+        "only explicit selected materialization should read dynamic backing"
     );
-    drop(runtime);
+    let selected_key = provider.loads[0].clone();
+    assert_eq!(
+        provider.replacements,
+        vec![vec![selected_key.clone()]],
+        "accepted authority mutation should replace only selected backing"
+    );
+
+    provider.loads.clear();
+    provider.replacements.clear();
+    let mut restarted = PartialPersistentRuntime::open(checked, provider)
+        .expect("published authority mutation should restart with both documents dormant");
+    assert_eq!(restarted.dormant_backing_keys().len(), 2);
+
+    restarted
+        .materialize_designation("selected")
+        .expect("selected target should remain materializable after authority mutation");
+    restarted
+        .run_action("observeSelected")
+        .expect("selected title should be readable after restart");
+    assert_eq!(
+        restarted.value("observedSelected").unwrap(),
+        Value::String("Renamed".into())
+    );
+
+    restarted
+        .materialize_root_member_index("folder", "documents", 1)
+        .expect("unrelated sibling should remain independently materializable");
+    restarted
+        .run_action("observeSibling")
+        .expect("sibling title should remain readable after restart");
+    assert_eq!(
+        restarted.value("observedSibling").unwrap(),
+        Value::String("Second".into())
+    );
+
+    let provider = restarted.into_provider();
+    assert_eq!(
+        provider.loads.len(),
+        2,
+        "verification should materialize exactly selected child and sibling"
+    );
+    assert_eq!(provider.loads[0], selected_key);
+    assert_ne!(
+        provider.loads[1], selected_key,
+        "sibling must retain a distinct backing identity"
+    );
 }
