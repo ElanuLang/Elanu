@@ -193,10 +193,8 @@ fn create_note(runtime: &mut CabinetRuntime) -> String {
         Ok(body) => body,
         Err(error) => return format!("Input failed: {error}"),
     };
-    match runtime.run_action_with_values(
-        "createNote",
-        &[Value::String(title), Value::String(body)],
-    ) {
+    match runtime.run_action_with_values("createNote", &[Value::String(title), Value::String(body)])
+    {
         Ok(()) => String::from("Created and selected note."),
         Err(error) => format!("createNote failed: {error}"),
     }
@@ -257,11 +255,11 @@ fn restart(
     checked: CheckedSource,
 ) -> Result<CabinetRuntime, (CabinetRuntime, Box<dyn Error>)> {
     let provider = runtime.into_provider();
-    match PartialPersistentRuntime::open(checked, provider) {
+    let fallback_provider = provider.clone();
+    match PartialPersistentRuntime::open(checked.clone(), provider) {
         Ok(mut restarted) => match materialize_visible(&mut restarted) {
             Ok(()) => Ok(restarted),
             Err(error) => {
-                let checked = checked_source().expect("embedded cabinet source should still check");
                 let provider = restarted.into_provider();
                 let mut prior = PartialPersistentRuntime::open(checked, provider)
                     .expect("published cabinet world should reopen");
@@ -270,10 +268,7 @@ fn restart(
             }
         },
         Err(error) => {
-            let provider = DirectoryProvider::open(PathBuf::from(".elanu-cabinet"))
-                .expect("cabinet provider should remain readable after failed reopen");
-            let checked = checked_source().expect("embedded cabinet source should still check");
-            let mut prior = PartialPersistentRuntime::open(checked, provider)
+            let mut prior = PartialPersistentRuntime::open(checked, fallback_provider)
                 .expect("published cabinet world should reopen");
             let _ = materialize_visible(&mut prior);
             Err((prior, Box::new(error)))
@@ -284,20 +279,16 @@ fn restart(
 fn string_value(runtime: &mut CabinetRuntime, name: &str) -> AppResult<String> {
     match runtime.value(name)? {
         Value::String(value) => Ok(value),
-        other => Err(io::Error::other(format!(
-            "'{name}' produced {other}, expected String"
-        ))
-        .into()),
+        other => {
+            Err(io::Error::other(format!("'{name}' produced {other}, expected String")).into())
+        }
     }
 }
 
 fn bool_value(runtime: &mut CabinetRuntime, name: &str) -> AppResult<bool> {
     match runtime.value(name)? {
         Value::Bool(value) => Ok(value),
-        other => Err(io::Error::other(format!(
-            "'{name}' produced {other}, expected Bool"
-        ))
-        .into()),
+        other => Err(io::Error::other(format!("'{name}' produced {other}, expected Bool")).into()),
     }
 }
 
@@ -338,11 +329,7 @@ impl DirectoryProvider {
         })
     }
 
-    fn publish(
-        &mut self,
-        manifest: &[u8],
-        backing: &HashMap<Vec<u8>, Vec<u8>>,
-    ) -> io::Result<()> {
+    fn publish(&mut self, manifest: &[u8], backing: &HashMap<Vec<u8>, Vec<u8>>) -> io::Result<()> {
         let generation = self
             .generation
             .checked_add(1)
