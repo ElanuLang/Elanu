@@ -88,11 +88,11 @@ fn checked_source() -> AppResult<CheckedSource> {
 
 fn materialize_visible(runtime: &mut CabinetRuntime) -> Result<(), RuntimeError> {
     runtime.materialize_designation("selectedFolder")?;
-    runtime.materialize_designation("trashFolder")?;
     if bool_value(runtime, "selectedNotePresent")
         .map_err(|error| RuntimeError::new(error.to_string()))?
     {
         runtime.materialize_designation("selectedNote")?;
+        runtime.materialize_designation("trashFolder")?;
     }
     Ok(())
 }
