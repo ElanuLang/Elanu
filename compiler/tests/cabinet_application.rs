@@ -188,10 +188,10 @@ fn cabinet_source_drives_create_edit_trash_restore_and_rollback() {
         .expect("visible selected folder should explicitly materialize");
     restarted
         .materialize_designation("trashFolder")
-        .expect("visible trash navigation should explicitly materialize");
+        .expect("trash navigation should explicitly materialize");
     restarted
         .materialize_designation("selectedNote")
-        .expect("visible selected note should explicitly materialize");
+        .expect("persisted selected note should explicitly materialize");
     assert_eq!(
         value(&mut restarted, "selectedNoteTitle"),
         Value::String("Edited note".into())
@@ -200,6 +200,41 @@ fn cabinet_source_drives_create_edit_trash_restore_and_rollback() {
         value(&mut restarted, "selectedNoteBody"),
         Value::String("Edited body".into())
     );
+    assert_eq!(
+        value(&mut restarted, "selectedNoteInTrash"),
+        Value::Bool(true)
+    );
+
+    restarted
+        .run_action("openTrash")
+        .expect("trash navigation should publish");
+    assert_eq!(
+        value(&mut restarted, "selectedFolderName"),
+        Value::String("Trash".into())
+    );
+    assert_eq!(
+        value(&mut restarted, "selectedNotePresent"),
+        Value::Bool(false)
+    );
+    assert_eq!(
+        restarted
+            .designation_member_len("selectedFolder", "notes")
+            .expect("trash notes should be observable"),
+        1
+    );
+    assert_eq!(
+        restarted
+            .designation_member_index_value("selectedFolder", "notes", 0, "title")
+            .expect("trashed note row should be observable"),
+        Value::String("Edited note".into())
+    );
+
+    restarted
+        .run_action_with_values("selectNote", &[Value::Int(0)])
+        .expect("trashed note selection should publish");
+    restarted
+        .materialize_designation("selectedNote")
+        .expect("selected trashed note should explicitly materialize");
     assert_eq!(
         value(&mut restarted, "selectedNoteInTrash"),
         Value::Bool(true)
@@ -224,6 +259,15 @@ fn cabinet_source_drives_create_edit_trash_restore_and_rollback() {
     restarted
         .run_action("trashSelectedNote")
         .expect("second trash move should publish");
+    restarted
+        .run_action("openTrash")
+        .expect("trash should open before permanent deletion");
+    restarted
+        .run_action_with_values("selectNote", &[Value::Int(0)])
+        .expect("trashed note should be selectable before permanent deletion");
+    restarted
+        .materialize_designation("selectedNote")
+        .expect("trashed note should materialize before permanent deletion");
     restarted
         .run_action("permanentlyDeleteSelectedNote")
         .expect("permanent deletion should publish");
