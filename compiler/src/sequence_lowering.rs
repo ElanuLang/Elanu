@@ -20,7 +20,7 @@ use crate::sequence_surface::{
     decode_sequence_literal, decode_sequence_live_type, SEQUENCE_INDEX_SEGMENT_PREFIX,
 };
 
-const LOWERED_SEQUENCE_VALUE_PREFIX: &str = "__meld_sequence_value$";
+const LOWERED_SEQUENCE_VALUE_PREFIX: &str = "__elanu_sequence_value$";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct SequenceVariant {

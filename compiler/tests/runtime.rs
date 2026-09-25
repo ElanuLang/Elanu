@@ -420,9 +420,9 @@ fn primitive_equality_produces_bool_values() {
     let mut runtime = runtime(
         r#"
 state enabled = true
-state name = "Meld"
+state name = "Elanu"
 derived enabledMatches = enabled == true
-derived nameMatches = name == "Meld"
+derived nameMatches = name == "Elanu"
 derived nameDiffers = name != "Other"
 "#,
     );

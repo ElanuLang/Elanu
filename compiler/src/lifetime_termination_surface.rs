@@ -7,8 +7,8 @@ use crate::ast::{
 use crate::diagnostic::Diagnostic;
 use crate::runtime_model_templates::RuntimeModelRoot;
 
-pub const DESTROY_BUILTIN_ACTION: &str = "__meld_surface_destroy_child_builtin";
-pub const PURGE_BUILTIN_ACTION: &str = "__meld_surface_purge_subtree_builtin";
+pub const DESTROY_BUILTIN_ACTION: &str = "__elanu_surface_destroy_child_builtin";
+pub const PURGE_BUILTIN_ACTION: &str = "__elanu_surface_purge_subtree_builtin";
 
 /// Preprocess the intentionally narrow rooted-child lifetime surface:
 ///

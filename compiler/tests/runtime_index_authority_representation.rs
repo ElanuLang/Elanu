@@ -34,5 +34,5 @@ action forward {
     let snapshot = runtime.snapshot().expect("snapshot should succeed");
     assert!(snapshot
         .iter()
-        .all(|entry| !entry.name.starts_with("__meld_runtime_index_grant$")));
+        .all(|entry| !entry.name.starts_with("__elanu_runtime_index_grant$")));
 }

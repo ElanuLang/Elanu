@@ -78,7 +78,7 @@ action proveRestoredOwner {
 
 fn designation(runtime: &mut Runtime, name: &str) -> String {
     let Value::String(target) = runtime
-        .value(&format!("__meld_live${name}"))
+        .value(&format!("__elanu_live${name}"))
         .expect("designation should exist")
     else {
         panic!("designation carrier should be String");

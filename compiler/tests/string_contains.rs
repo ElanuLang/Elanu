@@ -152,7 +152,7 @@ action startSearch {
     runtime.run_action("setup").unwrap();
     assert_eq!(runtime.value("observed").unwrap(), Value::Int(1));
 
-    let filter_name = "__meld_filter_member$invoice$matches";
+    let filter_name = "__elanu_filter_member$invoice$matches";
     assert_eq!(runtime.derived_evaluations(filter_name), Some(1));
 
     runtime.run_action("rename").unwrap();
@@ -251,7 +251,7 @@ action rename {
 
     runtime.run_action("setup").unwrap();
     assert_eq!(runtime.value("observed").unwrap(), Value::Int(1));
-    let filter_name = "__meld_filter_member$invoice$matches";
+    let filter_name = "__elanu_filter_member$invoice$matches";
     assert_eq!(runtime.derived_evaluations(filter_name), Some(1));
 
     assert!(runtime.run_action("searchThenFail").is_err());
@@ -288,7 +288,7 @@ fn contains_requires_string_operands() {
             joined.contains("contains") || joined.contains("Contains"),
             "{joined}"
         );
-        assert!(!joined.contains("__meld_"), "{joined}");
+        assert!(!joined.contains("__elanu_"), "{joined}");
     }
 }
 

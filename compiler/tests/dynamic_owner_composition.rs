@@ -90,8 +90,8 @@ fn dynamic_child_can_root_nested_child_without_becoming_owning_designation() {
     let mut runtime = runtime();
     runtime.run_action("seed").expect("seed should commit");
 
-    let projects = targets(&mut runtime, "__meld_mseq$workspace$projects");
-    let tasks = targets(&mut runtime, "__meld_mseq$workspace$tasks");
+    let projects = targets(&mut runtime, "__elanu_mseq$workspace$projects");
+    let tasks = targets(&mut runtime, "__elanu_mseq$workspace$tasks");
     assert_eq!(projects.len(), 2);
     assert_eq!(tasks.len(), 1);
     let primary_project = projects[0].clone();
@@ -102,7 +102,7 @@ fn dynamic_child_can_root_nested_child_without_becoming_owning_designation() {
         .expect_err("a live rooted descendant must still block parent destruction");
     assert!(error.message.contains("roots another live child"));
     assert_eq!(
-        runtime.value("__meld_live$selectedProject").unwrap(),
+        runtime.value("__elanu_live$selectedProject").unwrap(),
         Value::String(primary_project.clone())
     );
 
@@ -111,7 +111,7 @@ fn dynamic_child_can_root_nested_child_without_becoming_owning_designation() {
         .expect_err("another project designation must not gain lifetime authority");
     assert!(error.message.contains("rooting owner"));
     assert_eq!(
-        runtime.value("__meld_live$selectedTask").unwrap(),
+        runtime.value("__elanu_live$selectedTask").unwrap(),
         Value::String(nested_task)
     );
 
@@ -125,9 +125,9 @@ fn dynamic_child_can_root_nested_child_without_becoming_owning_designation() {
     runtime
         .run_action("destroySelectedTask")
         .expect("the recorded dynamic owner should authorize child destruction");
-    assert!(targets(&mut runtime, "__meld_mseq$workspace$tasks").is_empty());
+    assert!(targets(&mut runtime, "__elanu_mseq$workspace$tasks").is_empty());
     assert_eq!(
-        runtime.value("__meld_live$selectedTask").unwrap(),
+        runtime.value("__elanu_live$selectedTask").unwrap(),
         Value::String(String::new())
     );
 
@@ -135,11 +135,11 @@ fn dynamic_child_can_root_nested_child_without_becoming_owning_designation() {
         .run_action("destroySelectedProject")
         .expect("parent should become destroyable after its descendant ends");
     assert_eq!(
-        targets(&mut runtime, "__meld_mseq$workspace$projects").len(),
+        targets(&mut runtime, "__elanu_mseq$workspace$projects").len(),
         1
     );
     assert_eq!(
-        runtime.value("__meld_live$selectedProject").unwrap(),
+        runtime.value("__elanu_live$selectedProject").unwrap(),
         Value::String(String::new())
     );
 }
@@ -153,7 +153,7 @@ fn committed_dynamic_owner_can_root_additional_children_later() {
         .expect("persistent project designation should carry exact owner identity");
 
     assert_eq!(
-        targets(&mut runtime, "__meld_mseq$workspace$tasks").len(),
+        targets(&mut runtime, "__elanu_mseq$workspace$tasks").len(),
         2
     );
 }
@@ -180,5 +180,5 @@ action attempt {
         .run_action("attempt")
         .expect_err("absent maybe-live owner must not invent an owner identity");
     assert!(error.message.contains("owner"));
-    assert!(targets(&mut runtime, "__meld_mseq$workspace$tasks").is_empty());
+    assert!(targets(&mut runtime, "__elanu_mseq$workspace$tasks").is_empty());
 }

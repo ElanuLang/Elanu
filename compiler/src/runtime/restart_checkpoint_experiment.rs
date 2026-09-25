@@ -910,7 +910,7 @@ fn checkpoint_rejects_active_transaction_and_does_not_capture_staged_work() {
     runtime.transaction = Some(Transaction::default());
     runtime
         .write_state(
-            "__meld_live$restoreDestination",
+            "__elanu_live$restoreDestination",
             Value::String("staged".to_string()),
         )
         .expect("test staging should write inside transaction");
@@ -926,7 +926,7 @@ fn checkpoint_rejects_active_transaction_and_does_not_capture_staged_work() {
     assert_ne!(
         checkpoint
             .state_values
-            .get("__meld_live$restoreDestination"),
+            .get("__elanu_live$restoreDestination"),
         Some(&Value::String("staged".to_string()))
     );
 }

@@ -12,10 +12,10 @@ use crate::runtime_sequence_markers::encode_runtime_sequence_type;
 use crate::scoped_designation_surface::decode_scope_identity_param;
 use crate::semantic::ValueType;
 
-pub const REMOVE_OCCURRENCE_MARKER_ACTION: &str = "__meld_surface_remove_occurrence_marker";
-pub(crate) const REMOVE_DESIGNATION_SELECTOR_PREFIX: &str = "__meld_remove_designation_selector$";
-pub const GENERATED_REMOVE_ACTION_PREFIX: &str = "__meld_remove_occurrence_";
-pub const GENERATED_FILTERED_REMOVE_ACTION_PREFIX: &str = "__meld_remove_filtered_occurrence_";
+pub const REMOVE_OCCURRENCE_MARKER_ACTION: &str = "__elanu_surface_remove_occurrence_marker";
+pub(crate) const REMOVE_DESIGNATION_SELECTOR_PREFIX: &str = "__elanu_remove_designation_selector$";
+pub const GENERATED_REMOVE_ACTION_PREFIX: &str = "__elanu_remove_occurrence_";
+pub const GENERATED_FILTERED_REMOVE_ACTION_PREFIX: &str = "__elanu_remove_filtered_occurrence_";
 
 pub fn preprocess(source: &str) -> Result<String, Vec<Diagnostic>> {
     for reserved in [
@@ -629,7 +629,7 @@ action edit {
 }
 "#;
         let output = preprocess(source).unwrap();
-        assert!(output.contains("__meld_surface_remove_occurrence_marker(\"invoice.lines\", 0)"));
+        assert!(output.contains("__elanu_surface_remove_occurrence_marker(\"invoice.lines\", 0)"));
         assert!(output.contains("\"remove invoice.lines[1]\""));
         assert!(output.contains("// remove invoice.lines[2]"));
     }
@@ -643,7 +643,7 @@ action edit {
 "#;
         let output = preprocess(source).unwrap();
         assert!(output.contains(
-            "__meld_surface_remove_occurrence_marker(\"invoice.lines\", selectedLine + 1)"
+            "__elanu_surface_remove_occurrence_marker(\"invoice.lines\", selectedLine + 1)"
         ));
     }
 }

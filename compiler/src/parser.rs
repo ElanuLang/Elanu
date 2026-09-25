@@ -7,7 +7,7 @@ use crate::ast::{
 use crate::diagnostic::Diagnostic;
 use crate::token::{Token, TokenKind};
 
-const IMPLICIT_MODEL_INITIALIZER: &str = "__meld_implicit_model_initializer";
+const IMPLICIT_MODEL_INITIALIZER: &str = "__elanu_implicit_model_initializer";
 
 pub struct Parser {
     tokens: Vec<Token>,

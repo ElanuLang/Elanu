@@ -350,7 +350,7 @@ fn wrong_model_and_non_mapping_view_fail_without_private_representation() {
     })
     .expect_err("wrong model should fail");
     assert!(error.message.contains("expected live Task"));
-    assert!(!error.message.contains("__meld"));
+    assert!(!error.message.contains("__elanu"));
 
     let mut runtime = runtime_with_structure(&["A", "B", "C"], &["B", "A"]);
     runtime.states.insert(

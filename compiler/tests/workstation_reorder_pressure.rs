@@ -84,7 +84,7 @@ action tryWholeReplacement {
         .collect::<Vec<_>>()
         .join("\n");
 
-    assert!(!messages.contains("__meld_"));
+    assert!(!messages.contains("__elanu_"));
 }
 
 #[test]
@@ -127,5 +127,5 @@ action tryDetachReinsert {
         .collect::<Vec<_>>()
         .join("\n");
 
-    assert!(!messages.contains("__meld_"));
+    assert!(!messages.contains("__elanu_"));
 }

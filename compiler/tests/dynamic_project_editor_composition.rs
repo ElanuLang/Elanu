@@ -117,7 +117,7 @@ fn project_local_membership_filtering_switching_and_destroy_compose_by_identity(
         .run_action("destroySelected")
         .expect("destroy should use the selected project's exact owner identity");
     assert_eq!(
-        runtime.value("__meld_live$selectedTask").unwrap(),
+        runtime.value("__elanu_live$selectedTask").unwrap(),
         Value::String(String::new())
     );
 }

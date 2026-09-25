@@ -65,7 +65,7 @@ fn scoped_insert_adds_the_exact_fresh_designation_to_membership() {
     let Value::Sequence {
         element_model,
         targets,
-    } = runtime.value("__meld_mseq$invoice$lines").unwrap()
+    } = runtime.value("__elanu_mseq$invoice$lines").unwrap()
     else {
         panic!("invoice.lines should be realized as a runtime sequence");
     };
@@ -85,7 +85,7 @@ fn repeated_scoped_insertions_preserve_distinct_identity_and_order() {
     let Value::Sequence {
         element_model,
         targets,
-    } = runtime.value("__meld_mseq$invoice$lines").unwrap()
+    } = runtime.value("__elanu_mseq$invoice$lines").unwrap()
     else {
         panic!("invoice.lines should be realized as a runtime sequence");
     };
@@ -105,7 +105,7 @@ fn failed_scoped_insert_rolls_back_membership_and_fresh_identity() {
     assert!(error.message.contains("rollback insertion"));
     assert_eq!(runtime.value("observed").unwrap(), Value::Float(0.0));
     assert_eq!(
-        runtime.value("__meld_mseq$invoice$lines").unwrap(),
+        runtime.value("__elanu_mseq$invoice$lines").unwrap(),
         Value::Sequence {
             element_model: "LineItem".to_string(),
             targets: Vec::new(),
@@ -152,14 +152,14 @@ action attachToOwner {
     let Value::Sequence {
         targets: owner_lines,
         ..
-    } = runtime.value("__meld_mseq$invoice$lines").unwrap()
+    } = runtime.value("__elanu_mseq$invoice$lines").unwrap()
     else {
         panic!("invoice.lines should be a runtime sequence");
     };
     let Value::Sequence {
         targets: other_lines,
         ..
-    } = runtime.value("__meld_mseq$other$lines").unwrap()
+    } = runtime.value("__elanu_mseq$other$lines").unwrap()
     else {
         panic!("other.lines should be a runtime sequence");
     };
@@ -191,7 +191,7 @@ action add {
     );
 
     assert_eq!(
-        runtime.value("__meld_mseq$invoice$lines").unwrap(),
+        runtime.value("__elanu_mseq$invoice$lines").unwrap(),
         Value::Sequence {
             element_model: "LineItem".to_string(),
             targets: Vec::new(),
@@ -203,7 +203,7 @@ action add {
     let Value::Sequence {
         element_model,
         targets,
-    } = runtime.value("__meld_mseq$invoice$lines").unwrap()
+    } = runtime.value("__elanu_mseq$invoice$lines").unwrap()
     else {
         panic!("invoice.lines should remain a runtime sequence");
     };
@@ -248,13 +248,13 @@ action complete {
 
     let Value::Sequence {
         targets: backlog, ..
-    } = runtime.value("__meld_mseq$board$backlog").unwrap()
+    } = runtime.value("__elanu_mseq$board$backlog").unwrap()
     else {
         panic!("board.backlog should be a runtime sequence");
     };
     let Value::Sequence {
         targets: completed, ..
-    } = runtime.value("__meld_mseq$board$completed").unwrap()
+    } = runtime.value("__elanu_mseq$board$completed").unwrap()
     else {
         panic!("board.completed should be a runtime sequence");
     };
@@ -299,14 +299,14 @@ action share {
     let Value::Sequence {
         targets: left_tasks,
         ..
-    } = runtime.value("__meld_mseq$left$tasks").unwrap()
+    } = runtime.value("__elanu_mseq$left$tasks").unwrap()
     else {
         panic!("left.tasks should be a runtime sequence");
     };
     let Value::Sequence {
         targets: right_tasks,
         ..
-    } = runtime.value("__meld_mseq$right$tasks").unwrap()
+    } = runtime.value("__elanu_mseq$right$tasks").unwrap()
     else {
         panic!("right.tasks should be a runtime sequence");
     };

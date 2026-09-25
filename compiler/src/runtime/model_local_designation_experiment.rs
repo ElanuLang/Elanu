@@ -87,7 +87,7 @@ fn per_identity_model_member_state_can_reuse_existing_optional_designation_clean
     let mut runtime = runtime(SOURCE);
     runtime.run_action("seed").expect("seed should commit");
 
-    let holders = targets(&mut runtime, "__meld_mseq$workspace$children");
+    let holders = targets(&mut runtime, "__elanu_mseq$workspace$children");
     let holder_a = holders[0].clone();
     let holder_b = holders[1].clone();
     let target = holders[2].clone();
@@ -164,7 +164,7 @@ fn aborted_target_termination_restores_model_local_optional_designation_slots() 
     let mut runtime = runtime(SOURCE);
     runtime.run_action("seed").expect("seed should commit");
 
-    let identities = targets(&mut runtime, "__meld_mseq$workspace$children");
+    let identities = targets(&mut runtime, "__elanu_mseq$workspace$children");
     let holder_a = identities[0].clone();
     let holder_b = identities[1].clone();
     let target = identities[2].clone();
@@ -215,7 +215,7 @@ fn designation_role_disappears_with_the_model_member_state_that_owns_it() {
     let mut runtime = runtime(SOURCE);
     runtime.run_action("seed").expect("seed should commit");
 
-    let identities = targets(&mut runtime, "__meld_mseq$workspace$children");
+    let identities = targets(&mut runtime, "__elanu_mseq$workspace$children");
     let holder = identities[0].clone();
     let target = identities[2].clone();
 

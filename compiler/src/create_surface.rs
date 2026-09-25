@@ -4,7 +4,7 @@ use crate::ast::{ActionArgument, Declaration, Expr, Program, Statement};
 use crate::diagnostic::Diagnostic;
 use crate::runtime_model_templates::{RuntimeModelRoot, RuntimeModelTemplate};
 
-pub const CREATE_BUILTIN_ACTION: &str = "__meld_surface_create_builtin";
+pub const CREATE_BUILTIN_ACTION: &str = "__elanu_surface_create_builtin";
 
 /// Bootstrap preprocessor for the selected owner-relative creation statement:
 ///
@@ -264,9 +264,9 @@ mod tests {
     fn preprocesses_create_statement_and_injects_private_builtin() {
         let source = "action add {\n    create LineItem in invoice\n}\n";
         let output = preprocess(source).unwrap();
-        assert!(output.contains("__meld_surface_create_builtin(\"LineItem\", \"invoice\")"));
+        assert!(output.contains("__elanu_surface_create_builtin(\"LineItem\", \"invoice\")"));
         assert!(output.contains(
-            "action __meld_surface_create_builtin(modelName: String, ownerName: String) {}"
+            "action __elanu_surface_create_builtin(modelName: String, ownerName: String) {}"
         ));
     }
 

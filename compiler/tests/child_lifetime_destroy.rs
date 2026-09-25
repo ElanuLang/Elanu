@@ -77,9 +77,9 @@ fn owner_relative_destroy_ends_committed_leaf_lifetime_and_cleans_nonowning_stat
     let mut runtime = runtime(SOURCE);
     runtime.run_action("seed").expect("seed should commit");
 
-    let identity = targets(&mut runtime, "__meld_mseq$left$tasks")[0].clone();
+    let identity = targets(&mut runtime, "__elanu_mseq$left$tasks")[0].clone();
     assert_eq!(
-        targets(&mut runtime, "__meld_mseq$right$trash"),
+        targets(&mut runtime, "__elanu_mseq$right$trash"),
         vec![identity.clone(), identity.clone()]
     );
 
@@ -87,15 +87,15 @@ fn owner_relative_destroy_ends_committed_leaf_lifetime_and_cleans_nonowning_stat
         .run_action("permanentDelete")
         .expect("root owner should be able to destroy committed leaf child");
 
-    assert!(targets(&mut runtime, "__meld_mseq$left$tasks").is_empty());
-    assert!(targets(&mut runtime, "__meld_mseq$right$tasks").is_empty());
-    assert!(targets(&mut runtime, "__meld_mseq$right$trash").is_empty());
+    assert!(targets(&mut runtime, "__elanu_mseq$left$tasks").is_empty());
+    assert!(targets(&mut runtime, "__elanu_mseq$right$tasks").is_empty());
+    assert!(targets(&mut runtime, "__elanu_mseq$right$trash").is_empty());
     assert_eq!(
-        runtime.value("__meld_live$selected").unwrap(),
+        runtime.value("__elanu_live$selected").unwrap(),
         Value::String(String::new())
     );
     assert_eq!(
-        runtime.value("__meld_live$recent").unwrap(),
+        runtime.value("__elanu_live$recent").unwrap(),
         Value::String(String::new())
     );
 }
@@ -104,7 +104,7 @@ fn owner_relative_destroy_ends_committed_leaf_lifetime_and_cleans_nonowning_stat
 fn destroy_rolls_back_with_later_action_failure() {
     let mut runtime = runtime(SOURCE);
     runtime.run_action("seed").expect("seed should commit");
-    let identity = targets(&mut runtime, "__meld_mseq$left$tasks")[0].clone();
+    let identity = targets(&mut runtime, "__elanu_mseq$left$tasks")[0].clone();
 
     let error = runtime
         .run_action("destroyThenFail")
@@ -112,15 +112,15 @@ fn destroy_rolls_back_with_later_action_failure() {
     assert!(error.message.contains("later"));
 
     assert_eq!(
-        targets(&mut runtime, "__meld_mseq$left$tasks"),
+        targets(&mut runtime, "__elanu_mseq$left$tasks"),
         vec![identity.clone()]
     );
     assert_eq!(
-        targets(&mut runtime, "__meld_mseq$right$trash"),
+        targets(&mut runtime, "__elanu_mseq$right$trash"),
         vec![identity.clone(), identity.clone()]
     );
     assert_eq!(
-        runtime.value("__meld_live$selected").unwrap(),
+        runtime.value("__elanu_live$selected").unwrap(),
         Value::String(identity)
     );
 }
@@ -129,7 +129,7 @@ fn destroy_rolls_back_with_later_action_failure() {
 fn foreign_membership_owner_cannot_destroy_child() {
     let mut runtime = runtime(SOURCE);
     runtime.run_action("seed").expect("seed should commit");
-    let identity = targets(&mut runtime, "__meld_mseq$left$tasks")[0].clone();
+    let identity = targets(&mut runtime, "__elanu_mseq$left$tasks")[0].clone();
 
     let error = runtime
         .run_action("foreignDestroy")
@@ -138,11 +138,11 @@ fn foreign_membership_owner_cannot_destroy_child() {
     assert!(error.message.contains("not 'right'"));
 
     assert_eq!(
-        targets(&mut runtime, "__meld_mseq$left$tasks"),
+        targets(&mut runtime, "__elanu_mseq$left$tasks"),
         vec![identity.clone()]
     );
     assert_eq!(
-        runtime.value("__meld_live$selected").unwrap(),
+        runtime.value("__elanu_live$selected").unwrap(),
         Value::String(identity)
     );
 }
@@ -164,9 +164,9 @@ fn transaction_local_fresh_child_cannot_use_committed_child_destroy_surface() {
         .expect_err("first destroy surface must not select fresh-child cancellation semantics");
     assert!(error.message.contains("existing committed dynamic child"));
 
-    assert!(targets(&mut runtime, "__meld_mseq$left$tasks").is_empty());
+    assert!(targets(&mut runtime, "__elanu_mseq$left$tasks").is_empty());
     assert_eq!(
-        runtime.value("__meld_live$selected").unwrap(),
+        runtime.value("__elanu_live$selected").unwrap(),
         Value::String(String::new())
     );
 }

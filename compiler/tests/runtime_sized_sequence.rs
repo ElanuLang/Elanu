@@ -40,13 +40,13 @@ action populate {
     );
     let checked = check_source(&source).expect("source should check");
     assert_eq!(
-        checked.binding_type("__meld_mseq$invoice$lines"),
+        checked.binding_type("__elanu_mseq$invoice$lines"),
         Some(&ValueType::SequenceLive("LineItem".to_string()))
     );
 
     let mut runtime = Runtime::from_program(&checked).expect("runtime should initialize");
     assert_eq!(
-        runtime.value("__meld_mseq$invoice$lines").unwrap(),
+        runtime.value("__elanu_mseq$invoice$lines").unwrap(),
         Value::Sequence {
             element_model: "LineItem".to_string(),
             targets: vec![],
@@ -54,7 +54,7 @@ action populate {
     );
     runtime.run_action("populate").unwrap();
     assert_eq!(
-        runtime.value("__meld_mseq$invoice$lines").unwrap(),
+        runtime.value("__elanu_mseq$invoice$lines").unwrap(),
         Value::Sequence {
             element_model: "LineItem".to_string(),
             targets: vec!["itemA".to_string(), "itemB".to_string()],
@@ -90,8 +90,8 @@ action replace {
 
     assert_eq!(runtime_reducers.len(), 1);
     let (derived, payload) = runtime_reducers[0];
-    assert_eq!(derived.name, "__meld_reduce_member$invoice$total");
-    assert_eq!(payload.reduction.source, "__meld_mseq$invoice$lines");
+    assert_eq!(derived.name, "__elanu_reduce_member$invoice$total");
+    assert_eq!(payload.reduction.source, "__elanu_mseq$invoice$lines");
     assert!(!matches!(&derived.expression, Expr::If { .. }));
 }
 
@@ -167,6 +167,6 @@ state model Invoice {
         .collect::<Vec<_>>();
     assert_eq!(runtime_reducers.len(), 1);
     let (derived, payload) = runtime_reducers[0];
-    assert_eq!(derived.name, "__meld_reduce_member$invoice$total");
-    assert_eq!(payload.reduction.source, "__meld_mseq$invoice$lines");
+    assert_eq!(derived.name, "__elanu_reduce_member$invoice$total");
+    assert_eq!(payload.reduction.source, "__elanu_mseq$invoice$lines");
 }

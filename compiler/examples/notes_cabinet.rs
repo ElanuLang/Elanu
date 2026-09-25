@@ -3,7 +3,7 @@ use std::{
     error::Error,
     fs::{self, File},
     io::{self, Cursor, Read, Write},
-    path::{Path, PathBuf},
+    path::PathBuf,
 };
 
 use elanu_compiler::{
@@ -43,7 +43,7 @@ fn main() -> AppResult<()> {
         let command = prompt("command")?;
         status = match command.trim() {
             "q" | "quit" => break,
-            "h" | "home" => run(&mut runtime, "selectHome"),
+            "h" | "home" => run_visible(&mut runtime, "selectHome"),
             "f" | "folder" => select_index(&mut runtime, "selectFolder", "child folder index"),
             "n" | "note" => select_index(&mut runtime, "selectNote", "note index"),
             "nf" | "new-folder" => create_folder(&mut runtime),
@@ -51,7 +51,7 @@ fn main() -> AppResult<()> {
             "rf" | "rename-folder" => rename_folder(&mut runtime),
             "e" | "edit" => edit_note(&mut runtime),
             "t" | "trash" => run(&mut runtime, "trashSelectedNote"),
-            "r" | "restore" => run(&mut runtime, "restoreSelectedNote"),
+            "r" | "restore" => run_visible(&mut runtime, "restoreSelectedNote"),
             "d" | "delete" => run(&mut runtime, "permanentlyDeleteSelectedNote"),
             "x" | "fail" => demonstrate_rollback(&mut runtime),
             "restart" => match restart(runtime, checked.clone()) {
@@ -148,6 +148,18 @@ fn prompt(label: &str) -> AppResult<String> {
 fn run(runtime: &mut CabinetRuntime, action: &str) -> String {
     match runtime.run_action(action) {
         Ok(()) => format!("Committed {action}."),
+        Err(error) => format!("{action} failed: {error}"),
+    }
+}
+
+fn run_visible(runtime: &mut CabinetRuntime, action: &str) -> String {
+    match runtime.run_action(action) {
+        Ok(()) => match materialize_visible(runtime) {
+            Ok(()) => format!("Committed {action}."),
+            Err(error) => {
+                format!("Action committed, but visible materialization failed: {error}")
+            }
+        },
         Err(error) => format!("{action} failed: {error}"),
     }
 }

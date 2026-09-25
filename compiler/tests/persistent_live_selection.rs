@@ -264,5 +264,5 @@ action badSelection {
         .join("\n");
     assert!(messages.contains("live Task"));
     assert!(messages.contains("live Person"));
-    assert!(!messages.contains("__meld_"));
+    assert!(!messages.contains("__elanu_"));
 }
