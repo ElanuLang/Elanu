@@ -50,7 +50,9 @@ fn cabinet_source_drives_create_edit_trash_restore_and_rollback() {
     let mut runtime = PartialPersistentRuntime::open(checked.clone(), MemoryProvider::default())
         .expect("fresh cabinet should open");
 
-    runtime.run_action("initialize").expect("initialize should publish");
+    runtime
+        .run_action("initialize")
+        .expect("initialize should publish");
     assert_eq!(
         value(&mut runtime, "selectedFolderName"),
         Value::String("Notes".into())
@@ -97,7 +99,10 @@ fn cabinet_source_drives_create_edit_trash_restore_and_rollback() {
     runtime
         .run_action_with_values("selectNote", &[Value::Int(0)])
         .expect("trashed note should be selectable");
-    assert_eq!(value(&mut runtime, "selectedNoteInTrash"), Value::Bool(true));
+    assert_eq!(
+        value(&mut runtime, "selectedNoteInTrash"),
+        Value::Bool(true)
+    );
 
     let provider = runtime.into_provider();
     let mut restarted = PartialPersistentRuntime::open(checked, provider)
