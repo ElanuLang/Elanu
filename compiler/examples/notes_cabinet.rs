@@ -107,6 +107,9 @@ fn render(runtime: &mut CabinetRuntime, status: &str) -> AppResult<()> {
         false
     };
 
+    let folders = designation_member_strings(runtime, "selectedFolder", "folders", "name")?;
+    let notes = designation_member_strings(runtime, "selectedFolder", "notes", "title")?;
+
     print!("\x1b[2J\x1b[H");
     println!("ELANU NOTES CABINET");
     println!("===================");
@@ -120,6 +123,26 @@ fn render(runtime: &mut CabinetRuntime, status: &str) -> AppResult<()> {
         println!("Note:   <none selected>");
     }
     println!();
+    println!("Folders");
+    if folders.is_empty() {
+        println!("  <none>");
+    } else {
+        for (index, name) in folders.iter().enumerate() {
+            println!("  {index}  {name}");
+        }
+    }
+
+    println!();
+    println!("Notes");
+    if notes.is_empty() {
+        println!("  <none>");
+    } else {
+        for (index, title) in notes.iter().enumerate() {
+            println!("  {index}  {title}");
+        }
+    }
+
+    println!();
     if !status.is_empty() {
         println!("{status}");
         println!();
@@ -131,8 +154,6 @@ fn render(runtime: &mut CabinetRuntime, status: &str) -> AppResult<()> {
     println!("Proof:      x failing edit / rollback | restart persisted runtime");
     println!("Other:      ? help | q quit");
     println!();
-    println!("Current limitation under test: child lists are not mirrored in the host;");
-    println!("selection commands therefore use zero-based structural indices.");
     io::stdout().flush()?;
     Ok(())
 }
@@ -286,6 +307,30 @@ fn restart(
             Err((prior, Box::new(error)))
         }
     }
+}
+
+fn designation_member_strings(
+    runtime: &mut CabinetRuntime,
+    designation: &str,
+    member: &str,
+    child_member: &str,
+) -> AppResult<Vec<String>> {
+    let len = runtime.designation_member_len(designation, member)?;
+    let mut values = Vec::with_capacity(len);
+
+    for index in 0..len {
+        match runtime.designation_member_index_value(designation, member, index, child_member)? {
+            Value::String(value) => values.push(value),
+            other => {
+                return Err(io::Error::other(format!(
+                    "'{designation}.{member}[{index}].{child_member}' produced {other}, expected String"
+                ))
+                .into());
+            }
+        }
+    }
+
+    Ok(values)
 }
 
 fn string_value(runtime: &mut CabinetRuntime, name: &str) -> AppResult<String> {
