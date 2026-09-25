@@ -111,7 +111,7 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
             Some(Value::String(_)) => {
                 return Err(RuntimeError::new(format!(
                     "live designation '{designation}' has no target"
-                )))
+                )));
             }
             Some(other) => {
                 let type_name = other.type_name();
@@ -122,7 +122,7 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
             None => {
                 return Err(RuntimeError::new(format!(
                     "runtime binding for live designation '{designation}' is missing"
-                )))
+                )));
             }
         };
         let handle = self.backed.get(&identity).ok_or_else(|| {
@@ -177,7 +177,7 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
                 return Err(RuntimeError::new(format!(
                     "modeled root selection '{root}.{member}' must be [live T], got {}",
                     show_type(other)
-                )))
+                )));
             }
         };
         let state_name = self
@@ -283,6 +283,27 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
     }
 
     pub fn run_action(&mut self, name: &str) -> Result<(), RuntimeError> {
+        self.run_action_with_arguments(name, &[])
+    }
+
+    pub fn run_action_with_values(
+        &mut self,
+        name: &str,
+        values: &[Value],
+    ) -> Result<(), RuntimeError> {
+        let arguments = values
+            .iter()
+            .map(host_value_action_argument)
+            .collect::<Result<Vec<_>, _>>()?;
+
+        self.run_action_with_arguments(name, &arguments)
+    }
+
+    fn run_action_with_arguments(
+        &mut self,
+        name: &str,
+        arguments: &[ActionArgument],
+    ) -> Result<(), RuntimeError> {
         if self.runtime.transaction.is_some() {
             return Err(RuntimeError::new(
                 "partial persistent runtime cannot start a top-level action while a transaction is active",
@@ -296,7 +317,7 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
         let prior_next_backing_token = self.next_backing_token;
 
         self.runtime.transaction = Some(Transaction::default());
-        let result = self.runtime.invoke_action(name, &[]);
+        let result = self.runtime.invoke_action(name, arguments);
         let transaction = match result {
             Ok(()) => self
                 .runtime
@@ -498,6 +519,22 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
     pub fn into_provider(self) -> P {
         self.provider
     }
+}
+
+fn host_value_action_argument(value: &Value) -> Result<ActionArgument, RuntimeError> {
+    let expression = match value {
+        Value::Int(value) => Expr::Integer(*value),
+        Value::Float(value) => Expr::Float(*value),
+        Value::Bool(value) => Expr::Bool(*value),
+        Value::String(value) => Expr::String(value.clone()),
+        Value::Sequence { .. } => {
+            return Err(RuntimeError::new(
+                "partial persistent host action values cannot carry modeled identity sequences",
+            ));
+        }
+    };
+
+    Ok(ActionArgument::Value(expression))
 }
 
 fn encode_key(token: u64) -> Vec<u8> {
