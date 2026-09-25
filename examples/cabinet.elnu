@@ -68,11 +68,6 @@ action selectHome {
     selectedNote = none
 }
 
-action openTrash {
-    selectedFolder = trashFolder
-    selectedNote = none
-}
-
 action selectFolder(index: Int) {
     selectedFolder = selectedFolder.folders[index]
     selectedNote = none
@@ -115,7 +110,6 @@ action trashSelectedNote {
     transfer selectedNote from selectedFolder to trashFolder
     insert selectedNote into trashFolder.notes
     remove selectedNote from selectedFolder.notes
-    selectedNote = none
 }
 
 action restoreSelectedNote {
