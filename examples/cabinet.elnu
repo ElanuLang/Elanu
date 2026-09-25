@@ -68,6 +68,11 @@ action selectHome {
     selectedNote = none
 }
 
+action openTrash {
+    selectedFolder = trashFolder
+    selectedNote = none
+}
+
 action selectFolder(index: Int) {
     selectedFolder = selectedFolder.folders[index]
     selectedNote = none
