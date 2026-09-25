@@ -95,10 +95,6 @@ fn cabinet_source_drives_create_edit_trash_restore_and_rollback() {
     runtime
         .run_action("trashSelectedNote")
         .expect("trash move should publish");
-    runtime.run_action("openTrash").expect("trash should open");
-    runtime
-        .run_action_with_values("selectNote", &[Value::Int(0)])
-        .expect("trashed note should be selectable");
     assert_eq!(
         value(&mut runtime, "selectedNoteInTrash"),
         Value::Bool(true)
@@ -109,13 +105,20 @@ fn cabinet_source_drives_create_edit_trash_restore_and_rollback() {
         .expect("cabinet should restart with dynamic state dormant");
     restarted
         .materialize_designation("selectedFolder")
-        .expect("visible trash folder should explicitly materialize");
+        .expect("visible selected folder should explicitly materialize");
+    restarted
+        .materialize_designation("trashFolder")
+        .expect("visible trash navigation should explicitly materialize");
     restarted
         .materialize_designation("selectedNote")
         .expect("visible selected note should explicitly materialize");
     assert_eq!(
         value(&mut restarted, "selectedNoteTitle"),
         Value::String("First note".into())
+    );
+    assert_eq!(
+        value(&mut restarted, "selectedNoteInTrash"),
+        Value::Bool(true)
     );
 
     restarted
