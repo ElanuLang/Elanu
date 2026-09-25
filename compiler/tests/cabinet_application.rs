@@ -67,6 +67,50 @@ fn cabinet_source_drives_create_edit_trash_restore_and_rollback() {
     );
 
     runtime
+        .run_action_with_values("createFolder", &[Value::String("Archive".into())])
+        .expect("nested folder creation should publish");
+    assert_eq!(
+        value(&mut runtime, "selectedFolderName"),
+        Value::String("Archive".into())
+    );
+
+    runtime
+        .run_action("selectHome")
+        .expect("home selection should publish");
+    assert_eq!(
+        runtime
+            .designation_member_len("selectedFolder", "folders")
+            .expect("home folders should be observable"),
+        1
+    );
+    assert_eq!(
+        runtime
+            .designation_member_index_value("selectedFolder", "folders", 0, "name")
+            .expect("Projects row should be observable"),
+        Value::String("Projects".into())
+    );
+
+    runtime
+        .run_action_with_values("selectFolder", &[Value::Int(0)])
+        .expect("Projects selection should publish");
+    assert_eq!(
+        value(&mut runtime, "selectedFolderName"),
+        Value::String("Projects".into())
+    );
+    assert_eq!(
+        runtime
+            .designation_member_len("selectedFolder", "folders")
+            .expect("Projects child folders should be observable"),
+        1
+    );
+    assert_eq!(
+        runtime
+            .designation_member_index_value("selectedFolder", "folders", 0, "name")
+            .expect("nested Archive row should be observable"),
+        Value::String("Archive".into())
+    );
+
+    runtime
         .run_action_with_values(
             "createNote",
             &[
@@ -92,6 +136,30 @@ fn cabinet_source_drives_create_edit_trash_restore_and_rollback() {
         Value::String("First note".into())
     );
 
+    runtime
+        .run_action_with_values(
+            "editSelectedNote",
+            &[
+                Value::String("Edited note".into()),
+                Value::String("Edited body".into()),
+            ],
+        )
+        .expect("note edit should publish");
+    assert_eq!(
+        value(&mut runtime, "selectedNoteTitle"),
+        Value::String("Edited note".into())
+    );
+    assert_eq!(
+        value(&mut runtime, "selectedNoteBody"),
+        Value::String("Edited body".into())
+    );
+    assert_eq!(
+        runtime
+            .designation_member_index_value("selectedFolder", "notes", 0, "title")
+            .expect("edited visible note title should be observable"),
+        Value::String("Edited note".into())
+    );
+
     let error = runtime
         .run_action_with_values(
             "failEditSelectedNote",
@@ -101,7 +169,7 @@ fn cabinet_source_drives_create_edit_trash_restore_and_rollback() {
     assert!(error.message.contains("abort cabinet edit"));
     assert_eq!(
         value(&mut runtime, "selectedNoteTitle"),
-        Value::String("First note".into())
+        Value::String("Edited note".into())
     );
 
     runtime
@@ -126,7 +194,11 @@ fn cabinet_source_drives_create_edit_trash_restore_and_rollback() {
         .expect("visible selected note should explicitly materialize");
     assert_eq!(
         value(&mut restarted, "selectedNoteTitle"),
-        Value::String("First note".into())
+        Value::String("Edited note".into())
+    );
+    assert_eq!(
+        value(&mut restarted, "selectedNoteBody"),
+        Value::String("Edited body".into())
     );
     assert_eq!(
         value(&mut restarted, "selectedNoteInTrash"),
@@ -142,7 +214,7 @@ fn cabinet_source_drives_create_edit_trash_restore_and_rollback() {
     );
     assert_eq!(
         value(&mut restarted, "selectedNoteTitle"),
-        Value::String("First note".into())
+        Value::String("Edited note".into())
     );
     assert_eq!(
         value(&mut restarted, "selectedNoteInTrash"),
