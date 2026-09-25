@@ -79,6 +79,18 @@ fn cabinet_source_drives_create_edit_trash_restore_and_rollback() {
         value(&mut runtime, "selectedNoteTitle"),
         Value::String("First note".into())
     );
+    assert_eq!(
+        runtime
+            .designation_member_len("selectedFolder", "notes")
+            .expect("selected folder notes should be observable"),
+        1
+    );
+    assert_eq!(
+        runtime
+            .designation_member_index_value("selectedFolder", "notes", 0, "title")
+            .expect("visible note title should be observable"),
+        Value::String("First note".into())
+    );
 
     let error = runtime
         .run_action_with_values(
@@ -101,7 +113,7 @@ fn cabinet_source_drives_create_edit_trash_restore_and_rollback() {
     );
 
     let provider = runtime.into_provider();
-    let mut restarted = PartialPersistentRuntime::open(checked, provider)
+    let mut restarted = PartialPersistentRuntime::open(checked.clone(), provider)
         .expect("cabinet should restart with dynamic state dormant");
     restarted
         .materialize_designation("selectedFolder")
@@ -135,5 +147,39 @@ fn cabinet_source_drives_create_edit_trash_restore_and_rollback() {
     assert_eq!(
         value(&mut restarted, "selectedNoteInTrash"),
         Value::Bool(false)
+    );
+
+    restarted
+        .run_action("trashSelectedNote")
+        .expect("second trash move should publish");
+    restarted
+        .run_action("permanentlyDeleteSelectedNote")
+        .expect("permanent deletion should publish");
+    assert_eq!(
+        value(&mut restarted, "selectedNotePresent"),
+        Value::Bool(false)
+    );
+    assert_eq!(
+        restarted
+            .designation_member_len("trashFolder", "notes")
+            .expect("trash membership should remain observable after deletion"),
+        0
+    );
+
+    let provider = restarted.into_provider();
+    let mut reopened = PartialPersistentRuntime::open(checked, provider)
+        .expect("cabinet should reopen after permanent deletion");
+    reopened
+        .materialize_designation("trashFolder")
+        .expect("trash should explicitly materialize after restart");
+    assert_eq!(
+        value(&mut reopened, "selectedNotePresent"),
+        Value::Bool(false)
+    );
+    assert_eq!(
+        reopened
+            .designation_member_len("trashFolder", "notes")
+            .expect("trash should remain empty after restart"),
+        0
     );
 }
