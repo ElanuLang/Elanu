@@ -44,6 +44,7 @@ fn main() -> AppResult<()> {
         status = match command.trim() {
             "q" | "quit" => break,
             "h" | "home" => run_visible(&mut runtime, "selectHome"),
+            "ot" | "open-trash" => run_visible(&mut runtime, "openTrash"),
             "f" | "folder" => select_index(&mut runtime, "selectFolder", "child folder index"),
             "n" | "note" => select_index(&mut runtime, "selectNote", "note index"),
             "nf" | "new-folder" => create_folder(&mut runtime),
@@ -147,10 +148,10 @@ fn render(runtime: &mut CabinetRuntime, status: &str) -> AppResult<()> {
         println!("{status}");
         println!();
     }
-    println!("Navigation: h home | f child-folder-index | n note-index");
+    println!("Navigation: h home | ot trash | f child-folder-index | n note-index");
     println!("Create:     nf new folder | nn new note");
     println!("Edit:       rf rename folder | e edit note");
-    println!("Lifetime:   t trash | r restore | d permanently delete");
+    println!("Lifetime:   t trash selected note | r restore | d permanently delete");
     println!("Proof:      x failing edit / rollback | restart persisted runtime");
     println!("Other:      ? help | q quit");
     println!();
