@@ -117,10 +117,7 @@ fn failed_host_value_action_preserves_prior_selected_note() {
 
     runtime.run_action("seed").expect("seed should publish");
     let error = runtime
-        .run_action_with_values(
-            "editThenFail",
-            &[Value::String("Must roll back".into())],
-        )
+        .run_action_with_values("editThenFail", &[Value::String("Must roll back".into())])
         .expect_err("explicit failure should reject host-driven edit");
     assert!(error.message.contains("abort edit"));
     assert_eq!(
