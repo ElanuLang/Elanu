@@ -1,0 +1,138 @@
+state model Note {
+    state title = ""
+    state body = ""
+    state restoreParent: maybe live Folder = none
+}
+
+state model Folder {
+    state name = ""
+    state folders: [live Folder] = []
+    state notes: [live Note] = []
+    state restoreParent: maybe live Folder = none
+}
+
+state model Workspace {
+    state folders: [live Folder] = []
+}
+
+state workspace: Workspace
+state homeFolder: maybe live Folder = none
+state trashFolder: maybe live Folder = none
+state selectedFolder: maybe live Folder = none
+state selectedNote: maybe live Note = none
+state restoreFolder: maybe live Folder = none
+state initialized = false
+
+derived selectedFolderName = if selectedFolder is present {
+    selectedFolder.name
+} else {
+    ""
+}
+
+derived selectedNoteTitle = if selectedNote is present {
+    selectedNote.title
+} else {
+    ""
+}
+
+derived selectedNoteBody = if selectedNote is present {
+    selectedNote.body
+} else {
+    ""
+}
+
+derived selectedNotePresent = selectedNote is present
+derived selectedNoteInTrash = selectedNote is in trashFolder.notes
+
+action initialize {
+    if not initialized {
+        create Folder in workspace as home {
+            through home.name = "Notes"
+            insert home into workspace.folders
+            homeFolder = home
+            selectedFolder = home
+        }
+
+        create Folder in workspace as trash {
+            through trash.name = "Trash"
+            insert trash into workspace.folders
+            trashFolder = trash
+        }
+
+        initialized = true
+    }
+}
+
+action selectHome {
+    selectedFolder = homeFolder
+    selectedNote = none
+}
+
+action openTrash {
+    selectedFolder = trashFolder
+    selectedNote = none
+}
+
+action selectFolder(index: Int) {
+    selectedFolder = selectedFolder.folders[index]
+    selectedNote = none
+}
+
+action createFolder(name: String) {
+    create Folder in selectedFolder as folder {
+        through folder.name = name
+        insert folder into selectedFolder.folders
+        selectedFolder = folder
+        selectedNote = none
+    }
+}
+
+action renameSelectedFolder(name: String) {
+    through selectedFolder.name = name
+}
+
+action selectNote(index: Int) {
+    selectedNote = selectedFolder.notes[index]
+}
+
+action createNote(title: String, body: String) {
+    create Note in selectedFolder as note {
+        through note.title = title
+        through note.body = body
+        insert note into selectedFolder.notes
+        selectedNote = note
+    }
+}
+
+action editSelectedNote(title: String, body: String) {
+    through selectedNote.title = title
+    through selectedNote.body = body
+}
+
+action trashSelectedNote {
+    through selectedNote.restoreParent = selectedFolder
+    restoreFolder = selectedNote.restoreParent
+    transfer selectedNote from selectedFolder to trashFolder
+    insert selectedNote into trashFolder.notes
+    remove selectedNote from selectedFolder.notes
+    selectedNote = none
+}
+
+action restoreSelectedNote {
+    restoreFolder = selectedNote.restoreParent
+    transfer selectedNote from trashFolder to restoreFolder
+    insert selectedNote into restoreFolder.notes
+    remove selectedNote from trashFolder.notes
+    through selectedNote.restoreParent = none
+    selectedFolder = restoreFolder
+}
+
+action permanentlyDeleteSelectedNote {
+    remove selectedNote from trashFolder.notes
+    destroy selectedNote in trashFolder
+}
+
+action failEditSelectedNote(title: String) {
+    through selectedNote.title = title
+    fail "abort cabinet edit"
+}
