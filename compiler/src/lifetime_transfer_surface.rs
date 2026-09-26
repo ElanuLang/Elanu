@@ -7,7 +7,7 @@ use crate::ast::{
 use crate::diagnostic::Diagnostic;
 use crate::runtime_model_templates::RuntimeModelRoot;
 
-pub const TRANSFER_BUILTIN_ACTION: &str = "__meld_surface_transfer_child_builtin";
+pub const TRANSFER_BUILTIN_ACTION: &str = "__elanu_surface_transfer_child_builtin";
 
 /// Preprocess the intentionally narrow rooted-child lifetime transfer surface:
 ///
@@ -370,9 +370,9 @@ mod tests {
     fn preprocesses_transfer_statement_and_injects_private_builtin() {
         let source = "action moveOwnership {\n    transfer selected from left to right\n}\n";
         let output = preprocess(source).unwrap();
-        assert!(output.contains("__meld_surface_transfer_child_builtin(selected, left, right)"));
+        assert!(output.contains("__elanu_surface_transfer_child_builtin(selected, left, right)"));
         assert!(output.contains(
-            "action __meld_surface_transfer_child_builtin(target: String, sourceOwner: String, destinationOwner: String) {}"
+            "action __elanu_surface_transfer_child_builtin(target: String, sourceOwner: String, destinationOwner: String) {}"
         ));
     }
 
@@ -456,19 +456,19 @@ action destroyFromRight {
             Runtime::from_checked_source(&checked).expect("runtime should initialize");
         runtime.run_action("seed").expect("seed should commit");
 
-        let left_before = runtime.value("__meld_mseq$left$documents").unwrap();
-        let right_before = runtime.value("__meld_mseq$right$documents").unwrap();
+        let left_before = runtime.value("__elanu_mseq$left$documents").unwrap();
+        let right_before = runtime.value("__elanu_mseq$right$documents").unwrap();
         assert_eq!(left_before, right_before);
 
         runtime
             .run_action("transferSelected")
             .expect("transfer should commit");
         assert_eq!(
-            runtime.value("__meld_mseq$left$documents").unwrap(),
+            runtime.value("__elanu_mseq$left$documents").unwrap(),
             left_before
         );
         assert_eq!(
-            runtime.value("__meld_mseq$right$documents").unwrap(),
+            runtime.value("__elanu_mseq$right$documents").unwrap(),
             right_before
         );
 
@@ -481,7 +481,7 @@ action destroyFromRight {
             .run_action("destroyFromRight")
             .expect("new owner should prove lifetime authority");
         assert_eq!(
-            runtime.value("__meld_live$selected").unwrap(),
+            runtime.value("__elanu_live$selected").unwrap(),
             Value::String(String::new())
         );
     }

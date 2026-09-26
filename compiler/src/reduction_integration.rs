@@ -14,8 +14,8 @@ use crate::reduction_surface::{
 use crate::semantic::ValueType;
 use crate::sequence_surface::decode_sequence_live_type;
 
-const MODEL_SEQUENCE_BINDING_PREFIX: &str = "__meld_mseq$";
-const MODEL_REDUCTION_BINDING_PREFIX: &str = "__meld_reduce_member$";
+const MODEL_SEQUENCE_BINDING_PREFIX: &str = "__elanu_mseq$";
+const MODEL_REDUCTION_BINDING_PREFIX: &str = "__elanu_reduce_member$";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ReductionSourceKind {

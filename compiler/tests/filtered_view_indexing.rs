@@ -170,7 +170,7 @@ fn filtered_selection_does_not_depend_on_unread_child_facts() {
     runtime.run_action("setup").expect("setup should commit");
 
     assert_eq!(runtime.value("selectedQuantity").unwrap(), Value::Int(2));
-    let filter_name = "__meld_filter_member$invoice$activeLines";
+    let filter_name = "__elanu_filter_member$invoice$activeLines";
     assert_eq!(runtime.derived_evaluations(filter_name), Some(1));
     assert_eq!(runtime.derived_evaluations("selectedQuantity"), Some(1));
 

@@ -169,7 +169,7 @@ derived invalid = count is in workstation.tasks
     assert!(!diagnostics.is_empty());
     assert!(!diagnostics
         .iter()
-        .any(|diagnostic| diagnostic.message.contains("__meld_")));
+        .any(|diagnostic| diagnostic.message.contains("__elanu_")));
 }
 
 #[test]
@@ -202,5 +202,5 @@ derived invalid = selectedNote is in workstation.tasks
             && diagnostic.message.contains("live Task")));
     assert!(!diagnostics
         .iter()
-        .any(|diagnostic| diagnostic.message.contains("__meld_")));
+        .any(|diagnostic| diagnostic.message.contains("__elanu_")));
 }

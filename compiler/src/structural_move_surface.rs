@@ -13,9 +13,9 @@ use crate::scoped_designation_surface::decode_scope_identity_param;
 use crate::semantic::ValueType;
 use crate::structural_edit_surface::REMOVE_DESIGNATION_SELECTOR_PREFIX;
 
-pub const MOVE_RELATIVE_MARKER_ACTION: &str = "__meld_surface_move_relative_marker";
-pub const GENERATED_MOVE_ACTION_PREFIX: &str = "__meld_move_relative_";
-pub const GENERATED_FILTERED_MOVE_ACTION_PREFIX: &str = "__meld_move_filtered_relative_";
+pub const MOVE_RELATIVE_MARKER_ACTION: &str = "__elanu_surface_move_relative_marker";
+pub const GENERATED_MOVE_ACTION_PREFIX: &str = "__elanu_move_relative_";
+pub const GENERATED_FILTERED_MOVE_ACTION_PREFIX: &str = "__elanu_move_filtered_relative_";
 
 pub fn preprocess(source: &str) -> Result<String, Vec<Diagnostic>> {
     for reserved in [

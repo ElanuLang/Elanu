@@ -46,7 +46,7 @@ action setup {
 
     assert_eq!(
         runtime
-            .value("__meld_filter_member$invoice$activeLines")
+            .value("__elanu_filter_member$invoice$activeLines")
             .unwrap(),
         Value::Sequence {
             element_model: "LineItem".to_string(),
@@ -145,7 +145,7 @@ action changeNote {
 
     runtime.run_action("setup").unwrap();
     assert_eq!(runtime.value("observed").unwrap(), Value::Int(1));
-    let filter_name = "__meld_filter_member$invoice$activeLines";
+    let filter_name = "__elanu_filter_member$invoice$activeLines";
     assert_eq!(runtime.derived_evaluations(filter_name), Some(1));
 
     runtime.run_action("changeNote").unwrap();

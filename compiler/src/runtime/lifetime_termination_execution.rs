@@ -73,7 +73,7 @@ fn termination_clears_optional_designations_all_memberships_and_child_state_atom
     let mut runtime = runtime(OPTIONAL_SOURCE);
     runtime.run_action("seed").expect("seed should commit");
 
-    let identity = targets(&mut runtime, "__meld_mseq$left$tasks")[0].clone();
+    let identity = targets(&mut runtime, "__elanu_mseq$left$tasks")[0].clone();
     let title_state = model_binding_name(&identity, "title");
 
     runtime.transaction = Some(Transaction::default());
@@ -82,16 +82,16 @@ fn termination_clears_optional_designations_all_memberships_and_child_state_atom
         .expect("leaf child with only optional persistent designations should terminate");
 
     assert_eq!(
-        runtime.value("__meld_live$selected").unwrap(),
+        runtime.value("__elanu_live$selected").unwrap(),
         Value::String(String::new())
     );
     assert_eq!(
-        runtime.value("__meld_live$recent").unwrap(),
+        runtime.value("__elanu_live$recent").unwrap(),
         Value::String(String::new())
     );
-    assert!(targets(&mut runtime, "__meld_mseq$left$tasks").is_empty());
-    assert!(targets(&mut runtime, "__meld_mseq$right$tasks").is_empty());
-    assert!(targets(&mut runtime, "__meld_mseq$right$trash").is_empty());
+    assert!(targets(&mut runtime, "__elanu_mseq$left$tasks").is_empty());
+    assert!(targets(&mut runtime, "__elanu_mseq$right$tasks").is_empty());
+    assert!(targets(&mut runtime, "__elanu_mseq$right$trash").is_empty());
     assert!(!runtime.model_identity_exists(&identity));
     assert!(runtime.read_name(&title_state, None).is_err());
 
@@ -103,9 +103,9 @@ fn termination_clears_optional_designations_all_memberships_and_child_state_atom
 
     assert!(!runtime.dynamic_model_owners.contains_key(&identity));
     assert!(!runtime.states.contains_key(&title_state));
-    assert!(targets(&mut runtime, "__meld_mseq$left$tasks").is_empty());
-    assert!(targets(&mut runtime, "__meld_mseq$right$tasks").is_empty());
-    assert!(targets(&mut runtime, "__meld_mseq$right$trash").is_empty());
+    assert!(targets(&mut runtime, "__elanu_mseq$left$tasks").is_empty());
+    assert!(targets(&mut runtime, "__elanu_mseq$right$tasks").is_empty());
+    assert!(targets(&mut runtime, "__elanu_mseq$right$trash").is_empty());
 }
 
 #[test]
@@ -113,7 +113,7 @@ fn aborted_termination_restores_child_memberships_and_optional_designations() {
     let mut runtime = runtime(OPTIONAL_SOURCE);
     runtime.run_action("seed").expect("seed should commit");
 
-    let identity = targets(&mut runtime, "__meld_mseq$left$tasks")[0].clone();
+    let identity = targets(&mut runtime, "__elanu_mseq$left$tasks")[0].clone();
     let title_state = model_binding_name(&identity, "title");
 
     runtime.transaction = Some(Transaction::default());
@@ -125,23 +125,23 @@ fn aborted_termination_restores_child_memberships_and_optional_designations() {
 
     assert!(runtime.model_identity_exists(&identity));
     assert_eq!(
-        runtime.value("__meld_live$selected").unwrap(),
+        runtime.value("__elanu_live$selected").unwrap(),
         Value::String(identity.clone())
     );
     assert_eq!(
-        runtime.value("__meld_live$recent").unwrap(),
+        runtime.value("__elanu_live$recent").unwrap(),
         Value::String(identity.clone())
     );
     assert_eq!(
-        targets(&mut runtime, "__meld_mseq$left$tasks"),
+        targets(&mut runtime, "__elanu_mseq$left$tasks"),
         vec![identity.clone()]
     );
     assert_eq!(
-        targets(&mut runtime, "__meld_mseq$right$tasks"),
+        targets(&mut runtime, "__elanu_mseq$right$tasks"),
         vec![identity.clone()]
     );
     assert_eq!(
-        targets(&mut runtime, "__meld_mseq$right$trash"),
+        targets(&mut runtime, "__elanu_mseq$right$trash"),
         vec![identity.clone(), identity.clone()]
     );
     assert_eq!(
@@ -179,7 +179,7 @@ action seed {
 "#,
     );
     runtime.run_action("seed").expect("seed should commit");
-    let identity = targets(&mut runtime, "__meld_mseq$board$tasks")[0].clone();
+    let identity = targets(&mut runtime, "__elanu_mseq$board$tasks")[0].clone();
 
     let error = run_test_transaction(&mut runtime, |runtime| {
         runtime.write_state("marker", Value::Int(1))?;
@@ -191,11 +191,11 @@ action seed {
     assert_eq!(runtime.value("marker").unwrap(), Value::Int(0));
     assert!(runtime.model_identity_exists(&identity));
     assert_eq!(
-        runtime.value("__meld_live$required").unwrap(),
+        runtime.value("__elanu_live$required").unwrap(),
         Value::String(identity.clone())
     );
     assert_eq!(
-        targets(&mut runtime, "__meld_mseq$board$tasks"),
+        targets(&mut runtime, "__elanu_mseq$board$tasks"),
         vec![identity]
     );
 }
@@ -204,7 +204,7 @@ action seed {
 fn rooted_descendant_blocks_non_cascading_termination() {
     let mut runtime = runtime(OPTIONAL_SOURCE);
     runtime.run_action("seed").expect("seed should commit");
-    let identity = targets(&mut runtime, "__meld_mseq$left$tasks")[0].clone();
+    let identity = targets(&mut runtime, "__elanu_mseq$left$tasks")[0].clone();
 
     runtime.transaction = Some(Transaction::default());
     let descendant = runtime
@@ -235,7 +235,7 @@ fn rooted_descendant_blocks_non_cascading_termination() {
 fn foreign_membership_owner_is_not_lifetime_authority() {
     let mut runtime = runtime(OPTIONAL_SOURCE);
     runtime.run_action("seed").expect("seed should commit");
-    let identity = targets(&mut runtime, "__meld_mseq$left$tasks")[0].clone();
+    let identity = targets(&mut runtime, "__elanu_mseq$left$tasks")[0].clone();
 
     let error = run_test_transaction(&mut runtime, |runtime| {
         runtime.terminate_runtime_model(&identity, "right")
@@ -246,15 +246,15 @@ fn foreign_membership_owner_is_not_lifetime_authority() {
     assert!(error.message.contains("not 'right'"));
     assert!(runtime.model_identity_exists(&identity));
     assert_eq!(
-        targets(&mut runtime, "__meld_mseq$left$tasks"),
+        targets(&mut runtime, "__elanu_mseq$left$tasks"),
         vec![identity.clone()]
     );
     assert_eq!(
-        targets(&mut runtime, "__meld_mseq$right$tasks"),
+        targets(&mut runtime, "__elanu_mseq$right$tasks"),
         vec![identity.clone()]
     );
     assert_eq!(
-        runtime.value("__meld_live$selected").unwrap(),
+        runtime.value("__elanu_live$selected").unwrap(),
         Value::String(identity)
     );
 }
@@ -308,7 +308,7 @@ action purgeRoot {
 
 fn designation_target(runtime: &mut Runtime, name: &str) -> String {
     let Value::String(target) = runtime
-        .value(&format!("__meld_live${name}"))
+        .value(&format!("__elanu_live${name}"))
         .expect("designation should exist")
     else {
         panic!("designation should carry a String identity");
@@ -337,21 +337,21 @@ fn subtree_purge_experiment_reuses_leaf_cleanup_for_entire_provenance_subtree() 
     assert!(!runtime.model_identity_exists(&child));
     assert!(!runtime.model_identity_exists(&grandchild));
     assert!(runtime.model_identity_exists(&outsider));
-    assert!(targets(&mut runtime, "__meld_mseq$left$children").is_empty());
+    assert!(targets(&mut runtime, "__elanu_mseq$left$children").is_empty());
     assert_eq!(
-        targets(&mut runtime, "__meld_mseq$right$children"),
+        targets(&mut runtime, "__elanu_mseq$right$children"),
         vec![outsider]
     );
     assert_eq!(
-        runtime.value("__meld_live$root").unwrap(),
+        runtime.value("__elanu_live$root").unwrap(),
         Value::String(String::new())
     );
     assert_eq!(
-        runtime.value("__meld_live$child").unwrap(),
+        runtime.value("__elanu_live$child").unwrap(),
         Value::String(String::new())
     );
     assert_eq!(
-        runtime.value("__meld_live$grandchild").unwrap(),
+        runtime.value("__elanu_live$grandchild").unwrap(),
         Value::String(String::new())
     );
 }
@@ -459,7 +459,7 @@ fn subtree_purge_experiment_observes_staged_transfer_in() {
     assert!(!runtime.model_identity_exists(&root));
     assert!(!runtime.model_identity_exists(&outsider));
     assert_eq!(
-        runtime.value("__meld_live$outsider").unwrap(),
+        runtime.value("__elanu_live$outsider").unwrap(),
         Value::String(String::new())
     );
 }
@@ -512,7 +512,7 @@ fn compiler_accepted_purge_ends_the_current_committed_provenance_subtree() {
     assert!(!runtime.model_identity_exists(&grandchild));
     assert!(runtime.model_identity_exists(&outsider));
     assert_eq!(
-        runtime.value("__meld_live$root").unwrap(),
+        runtime.value("__elanu_live$root").unwrap(),
         Value::String(String::new())
     );
 }

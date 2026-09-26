@@ -246,7 +246,7 @@ action withdraw {
 fn parses_and_checks_bool_and_string_equality() {
     let source = r#"
 state enabled = true
-state name = "Meld"
+state name = "Elanu"
 derived sameFlag = enabled == true
 derived renamed = name != "Other"
 "#;

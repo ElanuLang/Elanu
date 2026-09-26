@@ -213,7 +213,7 @@ fn mutable_business_key_breaks_reconstruction_while_live_identity_remains_valid(
         Value::Bool(true)
     );
     // The copied key remains "B", but the selected child now has key "B2". The
-    // reduction therefore reports absence even though Meld still has the exact child.
+    // reduction therefore reports absence even though Elanu still has the exact child.
     assert_eq!(runtime.value("positionCode").unwrap(), Value::Int(3));
 }
 

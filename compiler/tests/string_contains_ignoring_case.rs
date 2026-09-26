@@ -146,7 +146,7 @@ action renameAfterSearch {
 
     runtime.run_action("setup").unwrap();
     assert_eq!(runtime.value("observed").unwrap(), Value::Int(1));
-    let filter_name = "__meld_filter_member$invoice$matches";
+    let filter_name = "__elanu_filter_member$invoice$matches";
     assert_eq!(runtime.derived_evaluations(filter_name), Some(1));
 
     runtime.run_action("renameWhileEmpty").unwrap();
@@ -229,6 +229,6 @@ fn ignoring_case_requires_string_operands_without_private_name_leakage() {
             .map(|error| error.message.as_str())
             .collect::<Vec<_>>()
             .join("\n");
-        assert!(!joined.contains("__meld_"), "{joined}");
+        assert!(!joined.contains("__elanu_"), "{joined}");
     }
 }

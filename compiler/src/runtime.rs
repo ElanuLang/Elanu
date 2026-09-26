@@ -438,7 +438,7 @@ impl Runtime {
             .ok_or_else(|| RuntimeError::new(format!("unknown runtime model '{model_name}'")))?;
 
         let identity = format!(
-            "__meld_dynamic${}${}",
+            "__elanu_dynamic${}${}",
             template.name, self.next_dynamic_identity
         );
         self.next_dynamic_identity = self
@@ -849,7 +849,7 @@ impl Runtime {
             optional_designations.push(name);
         }
 
-        let member_prefix = format!("__meld_sm${identity}$");
+        let member_prefix = format!("__elanu_sm${identity}$");
         let deleted_states = self
             .states
             .keys()
@@ -2970,7 +2970,7 @@ impl Value {
 }
 
 fn model_binding_name(root: &str, member: &str) -> String {
-    format!("__meld_sm${root}${member}")
+    format!("__elanu_sm${root}${member}")
 }
 
 fn coerce_value(value: Value, target: &ValueType) -> Result<Value, RuntimeError> {

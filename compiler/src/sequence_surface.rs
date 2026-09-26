@@ -1,8 +1,8 @@
 use crate::diagnostic::Diagnostic;
 
-pub const SEQUENCE_LIVE_TYPE_PREFIX: &str = "__meld_sequence_live_type_";
-pub const SEQUENCE_LITERAL_PREFIX: &str = "__meld_sequence_literal$";
-pub const SEQUENCE_INDEX_SEGMENT_PREFIX: &str = "__meld_sequence_index_";
+pub const SEQUENCE_LIVE_TYPE_PREFIX: &str = "__elanu_sequence_live_type_";
+pub const SEQUENCE_LITERAL_PREFIX: &str = "__elanu_sequence_literal$";
+pub const SEQUENCE_INDEX_SEGMENT_PREFIX: &str = "__elanu_sequence_index_";
 
 pub fn decode_sequence_live_type(name: &str) -> Option<&str> {
     name.strip_prefix(SEQUENCE_LIVE_TYPE_PREFIX)

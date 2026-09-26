@@ -45,7 +45,7 @@ action raiseThenFail {
 
     runtime.run_action("setup").expect("setup should commit");
     let before = runtime
-        .value("__meld_filter_member$board$visibleTickets")
+        .value("__elanu_filter_member$board$visibleTickets")
         .expect("ordered view should evaluate");
 
     let error = runtime
@@ -66,7 +66,7 @@ action raiseThenFail {
     );
     assert_eq!(
         runtime
-            .value("__meld_filter_member$board$visibleTickets")
+            .value("__elanu_filter_member$board$visibleTickets")
             .expect("ordered view should retain committed order"),
         before,
         "failed ordering-key mutation must not leak a reordered derived view",

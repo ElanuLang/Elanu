@@ -19,7 +19,7 @@ derived total = reduce order from 0 as (sum, invoice) {
     let displayed = format!("{program}");
 
     assert!(
-        !displayed.contains("__meld_"),
+        !displayed.contains("__elanu_"),
         "source-facing AST display leaked a private marker:\n{displayed}"
     );
     assert!(displayed.contains("StateDecl order: [live Invoice]"));
@@ -48,7 +48,7 @@ state model Invoice {
     let program = parse_source(source).expect("state-model sequence member should parse");
     let displayed = format!("{program}");
 
-    assert!(!displayed.contains("__meld_"), "{displayed}");
+    assert!(!displayed.contains("__elanu_"), "{displayed}");
     assert!(displayed.contains("StateDecl lines: [live LineItem]"));
     assert!(displayed.contains("SequenceLiteral"));
 }

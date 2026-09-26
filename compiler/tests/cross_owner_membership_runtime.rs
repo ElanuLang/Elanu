@@ -100,14 +100,14 @@ fn cross_owner_membership_preserves_identity_reads_authority_views_and_rollback(
     let Value::Sequence {
         targets: left_tasks,
         ..
-    } = runtime.value("__meld_mseq$left$tasks").unwrap()
+    } = runtime.value("__elanu_mseq$left$tasks").unwrap()
     else {
         panic!("left.tasks should be a runtime sequence");
     };
     let Value::Sequence {
         targets: right_tasks,
         ..
-    } = runtime.value("__meld_mseq$right$tasks").unwrap()
+    } = runtime.value("__elanu_mseq$right$tasks").unwrap()
     else {
         panic!("right.tasks should be a runtime sequence");
     };
@@ -131,7 +131,7 @@ fn cross_owner_membership_preserves_identity_reads_authority_views_and_rollback(
     let Value::Sequence {
         targets: right_after_rollback,
         ..
-    } = runtime.value("__meld_mseq$right$tasks").unwrap()
+    } = runtime.value("__elanu_mseq$right$tasks").unwrap()
     else {
         panic!("right.tasks should remain a runtime sequence");
     };
@@ -197,14 +197,14 @@ action reorderForeignView {
     let Value::Sequence {
         targets: left_before,
         ..
-    } = runtime.value("__meld_mseq$left$tasks").unwrap()
+    } = runtime.value("__elanu_mseq$left$tasks").unwrap()
     else {
         panic!("left.tasks should be a runtime sequence");
     };
     let Value::Sequence {
         targets: right_before,
         ..
-    } = runtime.value("__meld_mseq$right$tasks").unwrap()
+    } = runtime.value("__elanu_mseq$right$tasks").unwrap()
     else {
         panic!("right.tasks should be a runtime sequence");
     };
@@ -219,14 +219,14 @@ action reorderForeignView {
     let Value::Sequence {
         targets: left_after,
         ..
-    } = runtime.value("__meld_mseq$left$tasks").unwrap()
+    } = runtime.value("__elanu_mseq$left$tasks").unwrap()
     else {
         panic!("left.tasks should remain a runtime sequence");
     };
     let Value::Sequence {
         targets: right_after,
         ..
-    } = runtime.value("__meld_mseq$right$tasks").unwrap()
+    } = runtime.value("__elanu_mseq$right$tasks").unwrap()
     else {
         panic!("right.tasks should remain a runtime sequence");
     };

@@ -49,7 +49,7 @@ fn runtime() -> Runtime {
 
 fn document_targets(runtime: &mut Runtime) -> Vec<String> {
     let Value::Sequence { targets, .. } = runtime
-        .value("__meld_mseq$workspace$documents")
+        .value("__elanu_mseq$workspace$documents")
         .expect("documents membership should exist")
     else {
         panic!("documents should be a runtime sequence");
@@ -69,11 +69,11 @@ fn fresh_scoped_identity_can_be_persisted_without_reconstructing_it() {
     let created = targets[0].clone();
 
     assert_eq!(
-        runtime.value("__meld_live$selected").unwrap(),
+        runtime.value("__elanu_live$selected").unwrap(),
         Value::String(created.clone())
     );
     assert_eq!(
-        runtime.value("__meld_live$pinned").unwrap(),
+        runtime.value("__elanu_live$pinned").unwrap(),
         Value::String(created)
     );
 }
@@ -81,14 +81,14 @@ fn fresh_scoped_identity_can_be_persisted_without_reconstructing_it() {
 #[test]
 fn fresh_designation_persistence_rolls_back_with_the_creating_action() {
     let mut runtime = runtime();
-    let before = runtime.value("__meld_live$selected").unwrap();
+    let before = runtime.value("__elanu_live$selected").unwrap();
 
     runtime
         .run_action("createSelectThenFail")
         .expect_err("later failure should roll back creation, insertion, and selection");
 
     assert!(document_targets(&mut runtime).is_empty());
-    assert_eq!(runtime.value("__meld_live$selected").unwrap(), before);
+    assert_eq!(runtime.value("__elanu_live$selected").unwrap(), before);
 }
 
 #[test]

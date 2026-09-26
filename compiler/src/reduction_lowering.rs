@@ -8,9 +8,9 @@ use crate::diagnostic::Diagnostic;
 use crate::filter_integration::MODEL_FILTER_BINDING_PREFIX;
 use crate::reduction_surface::{decode_reduction, parse_expression_fragment, ReductionSpec};
 
-const LOWERED_SEQUENCE_VALUE_PREFIX: &str = "__meld_sequence_value$";
-const MODEL_SEQUENCE_BINDING_PREFIX: &str = "__meld_mseq$";
-const MODEL_BINDING_PREFIX: &str = "__meld_sm$";
+const LOWERED_SEQUENCE_VALUE_PREFIX: &str = "__elanu_sequence_value$";
+const MODEL_SEQUENCE_BINDING_PREFIX: &str = "__elanu_mseq$";
+const MODEL_BINDING_PREFIX: &str = "__elanu_sm$";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct SequenceVariant {

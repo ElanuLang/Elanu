@@ -13,8 +13,8 @@ use crate::runtime_sequence_markers::{
 };
 use crate::semantic::{show_type, RuntimeReductionPayload, ValueType};
 
-const MODEL_BINDING_PREFIX: &str = "__meld_sm$";
-const LOWERED_SEQUENCE_VALUE_PREFIX: &str = "__meld_sequence_value$";
+const MODEL_BINDING_PREFIX: &str = "__elanu_sm$";
+const LOWERED_SEQUENCE_VALUE_PREFIX: &str = "__elanu_sequence_value$";
 
 #[derive(Debug, Clone)]
 struct RuntimeSequenceInfo {

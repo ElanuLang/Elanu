@@ -231,5 +231,5 @@ action bad {
 
     assert!(messages.contains("live Other"));
     assert!(messages.contains("live Task"));
-    assert!(!messages.contains("__meld_"));
+    assert!(!messages.contains("__elanu_"));
 }

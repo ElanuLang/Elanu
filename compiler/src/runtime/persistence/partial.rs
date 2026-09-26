@@ -87,10 +87,10 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
         keys
     }
 
-    /// Materialize the exact modeled identity currently carried by one
-    /// top-level source designation. The host names application state, while
-    /// dynamic identity and backing-key correlation remain runtime-private.
-    pub fn materialize_designation(&mut self, designation: &str) -> Result<(), RuntimeError> {
+    fn designation_identity_and_handle(
+        &self,
+        designation: &str,
+    ) -> Result<(String, BackingHandle), RuntimeError> {
         let lowered = self
             .checked
             .runtime_designation_bindings
@@ -125,13 +125,151 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
                 )));
             }
         };
-        let handle = self.backed.get(&identity).ok_or_else(|| {
+        let handle = self.backed.get(&identity).cloned().ok_or_else(|| {
             RuntimeError::new(format!(
                 "live designation '{designation}' targets an identity without partial-persistence backing"
             ))
         })?;
-        let key = encode_key(handle.token);
-        self.materialize(&key)
+        Ok((identity, handle))
+    }
+
+    /// Materialize the exact modeled identity currently carried by one
+    /// top-level source designation. The host names application state, while
+    /// dynamic identity and backing-key correlation remain runtime-private.
+    pub fn materialize_designation(&mut self, designation: &str) -> Result<(), RuntimeError> {
+        let (_, handle) = self.designation_identity_and_handle(designation)?;
+        self.materialize(&encode_key(handle.token))
+    }
+
+    /// Return the number of current occurrences in one stored `[live T]`
+    /// member of the model currently carried by a top-level designation.
+    ///
+    /// The observation explicitly materializes the designated owner as needed.
+    /// Dynamic identities remain runtime-private.
+    pub fn designation_member_len(
+        &mut self,
+        designation: &str,
+        member: &str,
+    ) -> Result<usize, RuntimeError> {
+        let (_, targets) = self.designation_sequence_targets(designation, member)?;
+        Ok(targets.len())
+    }
+
+    /// Observe one primitive stored member of the child at a current
+    /// occurrence in a designation-owned `[live T]` sequence.
+    ///
+    /// The selected child is explicitly materialized as part of this
+    /// observation. Structural sequences and live designations are rejected so
+    /// runtime identity never crosses this host boundary.
+    pub fn designation_member_index_value(
+        &mut self,
+        designation: &str,
+        member: &str,
+        index: usize,
+        child_member: &str,
+    ) -> Result<Value, RuntimeError> {
+        let (expected_model, targets) = self.designation_sequence_targets(designation, member)?;
+        let identity = targets.get(index).cloned().ok_or_else(|| {
+            RuntimeError::new(format!(
+                "designation member index {index} is out of bounds for '{designation}.{member}' of length {}",
+                targets.len()
+            ))
+        })?;
+
+        let handle = self.backed.get(&identity).cloned().ok_or_else(|| {
+            RuntimeError::new(format!(
+                "selected identity from '{designation}.{member}[{index}]' has no partial-persistence backing"
+            ))
+        })?;
+        if handle.model_name != expected_model {
+            return Err(RuntimeError::new(format!(
+                "selected identity from '{designation}.{member}[{index}]' has model '{}' but sequence expects '{expected_model}'",
+                handle.model_name
+            )));
+        }
+
+        let child_metadata = stored_members(&self.checked, &handle)?
+            .into_iter()
+            .find(|candidate| candidate.name == child_member)
+            .ok_or_else(|| {
+                RuntimeError::new(format!(
+                    "state model '{}' has no stored member '{child_member}'",
+                    handle.model_name
+                ))
+            })?;
+        if child_metadata.designation.is_some()
+            || matches!(&child_metadata.value_type, ValueType::SequenceLive(_))
+        {
+            return Err(RuntimeError::new(format!(
+                "host observation '{designation}.{member}[{index}].{child_member}' must name primitive stored state"
+            )));
+        }
+
+        self.materialize(&encode_key(handle.token))?;
+        let values = runtime_backing_values(&self.checked, &self.runtime, &identity, &handle)?;
+        let value = values.get(child_member).cloned().ok_or_else(|| {
+            RuntimeError::new(format!(
+                "resident backed identity '{identity}' is missing state '{child_member}'"
+            ))
+        })?;
+
+        match value {
+            Value::Int(_) | Value::Float(_) | Value::Bool(_) | Value::String(_) => Ok(value),
+            Value::Sequence { .. } => Err(RuntimeError::new(format!(
+                "host observation '{designation}.{member}[{index}].{child_member}' exposed structural identity"
+            ))),
+        }
+    }
+
+    fn designation_sequence_targets(
+        &mut self,
+        designation: &str,
+        member: &str,
+    ) -> Result<(String, Vec<String>), RuntimeError> {
+        self.materialize_designation(designation)?;
+        let (identity, handle) = self.designation_identity_and_handle(designation)?;
+
+        let member_metadata = stored_members(&self.checked, &handle)?
+            .into_iter()
+            .find(|candidate| candidate.name == member)
+            .ok_or_else(|| {
+                RuntimeError::new(format!(
+                    "state model '{}' has no stored member '{member}'",
+                    handle.model_name
+                ))
+            })?;
+        let expected_model = match &member_metadata.value_type {
+            ValueType::SequenceLive(model) => model.clone(),
+            other => {
+                return Err(RuntimeError::new(format!(
+                    "designation member '{designation}.{member}' must be [live T], got {}",
+                    show_type(other)
+                )));
+            }
+        };
+
+        let values = runtime_backing_values(&self.checked, &self.runtime, &identity, &handle)?;
+        let current = values.get(member).cloned().ok_or_else(|| {
+            RuntimeError::new(format!(
+                "resident backed identity '{identity}' is missing state '{member}'"
+            ))
+        })?;
+        let Value::Sequence {
+            element_model,
+            targets,
+        } = current
+        else {
+            return Err(RuntimeError::new(format!(
+                "designation member '{designation}.{member}' is not structural membership"
+            )));
+        };
+        if element_model != expected_model {
+            return Err(RuntimeError::new(format!(
+                "designation member '{designation}.{member}' contains live {element_model} but expects live {expected_model}"
+            )));
+        }
+
+        Ok((expected_model, targets))
     }
 
     /// Materialize the exact child identity at one current occurrence of a
@@ -1216,6 +1354,30 @@ action failedRenameCold {
             Value::String("audited".into())
         );
         assert!(restarted.provider.loads.is_empty());
+    }
+
+    #[test]
+    fn designation_relative_observation_materializes_only_requested_children() {
+        let (checked, mut provider) = seeded_provider();
+        provider.loads.clear();
+        let mut runtime = PartialPersistentRuntime::open(checked, provider).unwrap();
+        let (folder_key, document_key) = keys_by_model(&runtime);
+
+        assert_eq!(
+            runtime
+                .designation_member_len("coldFolder", "documents")
+                .unwrap(),
+            1
+        );
+        assert_eq!(runtime.provider.loads, vec![folder_key.clone()]);
+
+        assert_eq!(
+            runtime
+                .designation_member_index_value("coldFolder", "documents", 0, "title",)
+                .unwrap(),
+            Value::String("Cold document".into())
+        );
+        assert_eq!(runtime.provider.loads, vec![folder_key, document_key]);
     }
 
     #[test]

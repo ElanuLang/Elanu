@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::ast::{decode_live_type_name, decode_maybe_live_type_name, Declaration, Program};
 use crate::runtime_model_templates::{RuntimeModelRoot, RuntimeModelTemplate};
 
-pub(crate) const LOWERED_DESIGNATION_PREFIX: &str = "__meld_live$";
+pub(crate) const LOWERED_DESIGNATION_PREFIX: &str = "__elanu_live$";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct RuntimeDesignationMetadata {
@@ -74,7 +74,7 @@ pub(crate) fn collect_model_members(
                 continue;
             };
             designations.insert(
-                format!("__meld_sm${}${}", root.name, member.name),
+                format!("__elanu_sm${}${}", root.name, member.name),
                 metadata.clone(),
             );
         }

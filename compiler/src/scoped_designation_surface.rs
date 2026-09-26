@@ -12,11 +12,11 @@ use crate::runtime_model_templates::{
 use crate::runtime_sequence_markers::encode_runtime_sequence_type;
 use crate::semantic::ValueType;
 
-pub(crate) const SCOPE_MARKER_ACTION: &str = "__meld_surface_designation_scope_marker";
-pub(crate) const SCOPE_BUILTIN_ACTION: &str = "__meld_surface_designation_scope_builtin";
-const GENERATED_SCOPE_ACTION_PREFIX: &str = "__meld_designation_scope_body_";
-const GENERATED_SCOPE_IDENTITY_PREFIX: &str = "__meld_designation_scope_identity$";
-const GENERATED_SCOPE_MEMBER_PREFIX: &str = "__meld_designation_scope_member_";
+pub(crate) const SCOPE_MARKER_ACTION: &str = "__elanu_surface_designation_scope_marker";
+pub(crate) const SCOPE_BUILTIN_ACTION: &str = "__elanu_surface_designation_scope_builtin";
+const GENERATED_SCOPE_ACTION_PREFIX: &str = "__elanu_designation_scope_body_";
+const GENERATED_SCOPE_IDENTITY_PREFIX: &str = "__elanu_designation_scope_identity$";
+const GENERATED_SCOPE_MEMBER_PREFIX: &str = "__elanu_designation_scope_member_";
 
 pub(crate) fn encode_scope_identity_param(model: &str, scope_id: usize) -> String {
     format!("{GENERATED_SCOPE_IDENTITY_PREFIX}{model}${scope_id}")

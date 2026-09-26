@@ -2,7 +2,7 @@ use crate::ast::{Declaration, Expr};
 use crate::diagnostic::Diagnostic;
 use crate::{lexer, parser::Parser, sequence_surface};
 
-pub const REDUCTION_PREFIX: &str = "__meld_reduce$";
+pub const REDUCTION_PREFIX: &str = "__elanu_reduce$";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReductionSpec {
@@ -123,7 +123,7 @@ pub fn preprocess(source: &str) -> Result<String, Vec<Diagnostic>> {
 }
 
 pub fn parse_expression_fragment(source: &str) -> Result<Expr, Vec<Diagnostic>> {
-    let synthetic = format!("derived __meld_reduce_fragment = {}\n", source.trim());
+    let synthetic = format!("derived __elanu_reduce_fragment = {}\n", source.trim());
     let synthetic = sequence_surface::preprocess(&synthetic)?;
     let tokens = lexer::lex(&synthetic)?;
     let program = Parser::new(tokens).parse_program()?;

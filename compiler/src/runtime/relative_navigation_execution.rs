@@ -364,5 +364,5 @@ fn wrong_model_structure_is_rejected_without_exposing_position() {
 
     assert!(error.message.contains("expected live Task structure"));
     assert!(!error.message.contains("index"));
-    assert!(!error.message.contains("__meld"));
+    assert!(!error.message.contains("__elanu"));
 }

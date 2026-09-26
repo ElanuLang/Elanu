@@ -102,7 +102,7 @@ fn sequence(runtime: &mut Runtime) -> (String, Vec<String>) {
     let Value::Sequence {
         element_model,
         targets,
-    } = runtime.value("__meld_mseq$invoice$lines").unwrap()
+    } = runtime.value("__elanu_mseq$invoice$lines").unwrap()
     else {
         panic!("invoice.lines should be realized as a runtime sequence");
     };
@@ -336,7 +336,7 @@ fn removing_all_occurrences_does_not_destroy_the_removed_child_state() {
     assert_eq!(after, vec![before[2].clone()]);
     assert_eq!(
         runtime
-            .value(&format!("__meld_sm${first_child}$quantity"))
+            .value(&format!("__elanu_sm${first_child}$quantity"))
             .unwrap(),
         Value::Int(2)
     );
@@ -369,5 +369,5 @@ action removeSelected {
     }));
     assert!(errors
         .iter()
-        .all(|error| !error.message.contains("__meld_remove_occurrence_")));
+        .all(|error| !error.message.contains("__elanu_remove_occurrence_")));
 }
