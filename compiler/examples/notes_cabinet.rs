@@ -129,12 +129,20 @@ fn render(runtime: &mut CabinetRuntime, status: &str) -> AppResult<()> {
 
         for (index, name) in folders.iter().enumerate() {
             rendered += 1;
-            let branch = if rendered == total { "└─" } else { "├─" };
+            let branch = if rendered == total {
+                "└─"
+            } else {
+                "├─"
+            };
             println!("│   {branch} [f{index}] {name}/");
         }
         for (index, title) in notes.iter().enumerate() {
             rendered += 1;
-            let branch = if rendered == total { "└─" } else { "├─" };
+            let branch = if rendered == total {
+                "└─"
+            } else {
+                "├─"
+            };
             println!("│   {branch} [n{index}] {title}");
         }
     }
