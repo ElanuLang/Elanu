@@ -22,6 +22,9 @@ const SNAPSHOT_VERSION: u32 = 1;
 type CabinetRuntime = PartialPersistentRuntime<DirectoryProvider>;
 type AppResult<T> = Result<T, Box<dyn Error>>;
 
+// Host boundary: this example may retain terminal input/status state, but it must not
+// retain modeled identities, structural membership, application selection, parentage,
+// trash state, restore semantics, or any other authoritative Cabinet application fact.
 fn main() -> AppResult<()> {
     let checked = checked_source()?;
     let world_dir = std::env::args()
@@ -40,7 +43,7 @@ fn main() -> AppResult<()> {
     let mut status = String::from("Notes Cabinet opened.");
     loop {
         render(&mut runtime, &status)?;
-        let command = prompt("command")?;
+        let command = prompt("cabinet")?;
         status = match command.trim() {
             "q" | "quit" => break,
             "h" | "home" => run_visible(&mut runtime, "selectHome"),
@@ -110,50 +113,64 @@ fn render(runtime: &mut CabinetRuntime, status: &str) -> AppResult<()> {
 
     let folders = designation_member_strings(runtime, "selectedFolder", "folders", "name")?;
     let notes = designation_member_strings(runtime, "selectedFolder", "notes", "title")?;
+    let current_marker = if folder == "Trash" { "TRASH" } else { "FOLDER" };
 
     print!("\x1b[2J\x1b[H");
-    println!("ELANU NOTES CABINET");
-    println!("===================");
-    println!("Folder: {folder}");
-    if note_present {
-        let location = if in_trash { " [TRASHED]" } else { "" };
-        println!("Note:   {note_title}{location}");
-        println!();
-        println!("{note_body}");
+    println!("┌─ ELANU NOTES CABINET ─────────────────────────────────────────────────────┐");
+    println!("│ {current_marker}: {folder}");
+    println!("├─ CONTENTS ────────────────────────────────────────────────────────────────┤");
+    println!("│ {folder}/");
+
+    if folders.is_empty() && notes.is_empty() {
+        println!("│   └─ <empty>");
     } else {
-        println!("Note:   <none selected>");
-    }
-    println!();
-    println!("Folders");
-    if folders.is_empty() {
-        println!("  <none>");
-    } else {
+        let total = folders.len() + notes.len();
+        let mut rendered = 0usize;
+
         for (index, name) in folders.iter().enumerate() {
-            println!("  {index}  {name}");
+            rendered += 1;
+            let branch = if rendered == total { "└─" } else { "├─" };
+            println!("│   {branch} [f{index}] {name}/");
         }
-    }
-
-    println!();
-    println!("Notes");
-    if notes.is_empty() {
-        println!("  <none>");
-    } else {
         for (index, title) in notes.iter().enumerate() {
-            println!("  {index}  {title}");
+            rendered += 1;
+            let branch = if rendered == total { "└─" } else { "├─" };
+            println!("│   {branch} [n{index}] {title}");
         }
     }
 
-    println!();
-    if !status.is_empty() {
-        println!("{status}");
-        println!();
+    println!("├─ SELECTED NOTE ──────────────────────────────────────────────────────────┤");
+    if note_present {
+        let badge = if in_trash { "  [TRASHED]" } else { "" };
+        println!("│ {note_title}{badge}");
+        println!("│");
+        if note_body.is_empty() {
+            println!("│ <empty body>");
+        } else {
+            for line in note_body.lines() {
+                println!("│ {line}");
+            }
+        }
+    } else {
+        println!("│ <none selected>");
     }
-    println!("Navigation: h home | ot trash | f child-folder-index | n note-index");
-    println!("Create:     nf new folder | nn new note");
-    println!("Edit:       rf rename folder | e edit note");
-    println!("Lifetime:   t trash selected note | r restore | d permanently delete");
-    println!("Proof:      x failing edit / rollback | restart persisted runtime");
-    println!("Other:      ? help | q quit");
+
+    println!("├─ PLACES ─────────────────────────────────────────────────────────────────┤");
+    println!("│ [h] Home / Notes                         [ot] Trash");
+    println!("├─ COMMANDS ───────────────────────────────────────────────────────────────┤");
+    println!("│ Open       [f] child folder by index   [n] note by index");
+    println!("│ Create     [nf] folder                 [nn] note");
+    println!("│ Edit       [rf] rename folder          [e] edit selected note");
+    println!("│ Lifetime   [t] trash                   [r] restore   [d] permanent delete");
+    println!("│ Test       [x] rollback proof          [restart] reopen persisted world");
+    println!("│ Other      [?] help                    [q] quit");
+    println!("├─ STATUS ─────────────────────────────────────────────────────────────────┤");
+    if status.is_empty() {
+        println!("│ Ready.");
+    } else {
+        println!("│ {status}");
+    }
+    println!("└──────────────────────────────────────────────────────────────────────────┘");
     println!();
     io::stdout().flush()?;
     Ok(())
