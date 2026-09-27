@@ -41,38 +41,38 @@ action abortA {
 "#,
     );
 
-    let a = "__meld_mseq$invoiceA$lines";
-    let b = "__meld_mseq$invoiceB$lines";
+    let a = "__elanu_mseq$invoiceA$lines";
+    let b = "__elanu_mseq$invoiceB$lines";
 
     assert_eq!(
         runtime.value(a).unwrap(),
-        Value::String("__meld_sequence_value$".to_string())
+        Value::String("__elanu_sequence_value$".to_string())
     );
     assert_eq!(
         runtime.value(b).unwrap(),
-        Value::String("__meld_sequence_value$".to_string())
+        Value::String("__elanu_sequence_value$".to_string())
     );
 
     runtime.run_action("populateA").unwrap();
     assert_eq!(
         runtime.value(a).unwrap(),
-        Value::String("__meld_sequence_value$itemA|itemB".to_string())
+        Value::String("__elanu_sequence_value$itemA|itemB".to_string())
     );
     assert_eq!(
         runtime.value(b).unwrap(),
-        Value::String("__meld_sequence_value$".to_string())
+        Value::String("__elanu_sequence_value$".to_string())
     );
 
     runtime.run_action("populateB").unwrap();
     assert_eq!(
         runtime.value(b).unwrap(),
-        Value::String("__meld_sequence_value$itemB".to_string())
+        Value::String("__elanu_sequence_value$itemB".to_string())
     );
 
     assert!(runtime.run_action("abortA").is_err());
     assert_eq!(
         runtime.value(a).unwrap(),
-        Value::String("__meld_sequence_value$itemA|itemB".to_string())
+        Value::String("__elanu_sequence_value$itemA|itemB".to_string())
     );
 }
 

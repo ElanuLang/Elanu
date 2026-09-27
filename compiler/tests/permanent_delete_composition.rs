@@ -74,12 +74,12 @@ fn realistic_trash_lifecycle_composes_without_mirrored_liveness_or_manual_cleanu
     let mut runtime = runtime();
     runtime.run_action("seed").expect("seed should commit");
 
-    let initial_active = targets(&mut runtime, "__meld_mseq$workspace$active");
+    let initial_active = targets(&mut runtime, "__elanu_mseq$workspace$active");
     assert_eq!(initial_active.len(), 2);
     let first = initial_active[0].clone();
     let second = initial_active[1].clone();
     assert_eq!(
-        targets(&mut runtime, "__meld_mseq$searchIndex$cached"),
+        targets(&mut runtime, "__elanu_mseq$searchIndex$cached"),
         vec![first.clone(), first.clone()]
     );
 
@@ -88,28 +88,28 @@ fn realistic_trash_lifecycle_composes_without_mirrored_liveness_or_manual_cleanu
         .expect("soft delete should edit membership without ending child lifetime");
 
     assert_eq!(
-        targets(&mut runtime, "__meld_mseq$workspace$active"),
+        targets(&mut runtime, "__elanu_mseq$workspace$active"),
         vec![second.clone()]
     );
     assert_eq!(
-        targets(&mut runtime, "__meld_mseq$workspace$trash"),
+        targets(&mut runtime, "__elanu_mseq$workspace$trash"),
         vec![first.clone()]
     );
     assert_eq!(
-        runtime.value("__meld_live$selected").unwrap(),
+        runtime.value("__elanu_live$selected").unwrap(),
         Value::String(first.clone())
     );
     assert_eq!(
-        runtime.value("__meld_live$recent").unwrap(),
+        runtime.value("__elanu_live$recent").unwrap(),
         Value::String(first.clone())
     );
 
     runtime
         .run_action("restoreSelected")
         .expect("restore should reuse the same persistent child identity");
-    assert!(targets(&mut runtime, "__meld_mseq$workspace$trash").is_empty());
+    assert!(targets(&mut runtime, "__elanu_mseq$workspace$trash").is_empty());
     assert_eq!(
-        targets(&mut runtime, "__meld_mseq$workspace$active"),
+        targets(&mut runtime, "__elanu_mseq$workspace$active"),
         vec![second.clone(), first.clone()]
     );
 
@@ -121,17 +121,17 @@ fn realistic_trash_lifecycle_composes_without_mirrored_liveness_or_manual_cleanu
         .expect("root owner should permanently delete the committed leaf child");
 
     assert_eq!(
-        targets(&mut runtime, "__meld_mseq$workspace$active"),
+        targets(&mut runtime, "__elanu_mseq$workspace$active"),
         vec![second]
     );
-    assert!(targets(&mut runtime, "__meld_mseq$workspace$trash").is_empty());
-    assert!(targets(&mut runtime, "__meld_mseq$searchIndex$cached").is_empty());
+    assert!(targets(&mut runtime, "__elanu_mseq$workspace$trash").is_empty());
+    assert!(targets(&mut runtime, "__elanu_mseq$searchIndex$cached").is_empty());
     assert_eq!(
-        runtime.value("__meld_live$selected").unwrap(),
+        runtime.value("__elanu_live$selected").unwrap(),
         Value::String(String::new())
     );
     assert_eq!(
-        runtime.value("__meld_live$recent").unwrap(),
+        runtime.value("__elanu_live$recent").unwrap(),
         Value::String(String::new())
     );
 }

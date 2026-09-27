@@ -55,7 +55,7 @@ def test_failed_creation_leaves_no_committed_scope_registration():
     assert scope.order.get() == []
 
     # The host-language object may still physically exist because the Python
-    # test deliberately retained it. That is not committed Meld semantic
+    # test deliberately retained it. That is not committed Elanu semantic
     # lifetime. The scope refuses to attach it because its ownership
     # registration rolled back.
     line = escaped_host_reference[0]

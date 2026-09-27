@@ -12,13 +12,13 @@ use crate::runtime_model_templates::{
 use crate::runtime_sequence_markers::encode_runtime_sequence_type;
 use crate::semantic::ValueType;
 
-pub const CREATE_SCOPE_MARKER_ACTION: &str = "__meld_surface_create_scope_marker";
-pub const CREATE_SCOPE_BUILTIN_ACTION: &str = "__meld_surface_create_scope_builtin";
-pub const INSERT_SCOPE_MARKER_ACTION: &str = "__meld_surface_insert_scope_marker";
-pub const GENERATED_INSERT_ACTION_PREFIX: &str = "__meld_create_scope_insert_";
-const GENERATED_SCOPE_ACTION_PREFIX: &str = "__meld_create_scope_body_";
-const GENERATED_SCOPE_MEMBER_PREFIX: &str = "__meld_create_scope_member_";
-const GENERATED_SCOPE_IDENTITY_PREFIX: &str = "__meld_create_scope_identity_";
+pub const CREATE_SCOPE_MARKER_ACTION: &str = "__elanu_surface_create_scope_marker";
+pub const CREATE_SCOPE_BUILTIN_ACTION: &str = "__elanu_surface_create_scope_builtin";
+pub const INSERT_SCOPE_MARKER_ACTION: &str = "__elanu_surface_insert_scope_marker";
+pub const GENERATED_INSERT_ACTION_PREFIX: &str = "__elanu_create_scope_insert_";
+const GENERATED_SCOPE_ACTION_PREFIX: &str = "__elanu_create_scope_body_";
+const GENERATED_SCOPE_MEMBER_PREFIX: &str = "__elanu_create_scope_member_";
+const GENERATED_SCOPE_IDENTITY_PREFIX: &str = "__elanu_create_scope_identity_";
 
 /// Experimental surface transport for:
 ///
@@ -1278,7 +1278,7 @@ mod tests {
 "#;
         let output = preprocess(source).unwrap();
         assert!(output.contains(
-            "if true {\n__meld_surface_create_scope_marker(\"LineItem\", invoice, \"line\")"
+            "if true {\n__elanu_surface_create_scope_marker(\"LineItem\", invoice, \"line\")"
         ));
         assert!(output.contains("through line.quantity = 3"));
     }

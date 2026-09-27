@@ -16,32 +16,32 @@ from typing import Any, Callable, Generic, TypeVar
 T = TypeVar("T")
 
 _current_tracker: ContextVar[Any | None] = ContextVar(
-    "meld_current_tracker", default=None
+    "elanu_current_tracker", default=None
 )
-_current_tx: ContextVar["Transaction | None"] = ContextVar("meld_current_tx", default=None)
+_current_tx: ContextVar["Transaction | None"] = ContextVar("elanu_current_tx", default=None)
 _eval_stack: ContextVar[tuple["Derived[Any]", ...]] = ContextVar(
-    "meld_eval_stack", default=()
+    "elanu_eval_stack", default=()
 )
 
 
-class MeldSemanticError(RuntimeError):
+class ElanuSemanticError(RuntimeError):
     pass
 
 
-class MutationOutsideAction(MeldSemanticError):
+class MutationOutsideAction(ElanuSemanticError):
     pass
 
 
-class DerivedCycle(MeldSemanticError):
+class DerivedCycle(ElanuSemanticError):
     pass
 
 
-class ActionAborted(MeldSemanticError):
+class ActionAborted(ElanuSemanticError):
     pass
 
 
-class WritableAuthorityError(MeldSemanticError):
-    """Writable state authority was used as an ordinary Meld value."""
+class WritableAuthorityError(ElanuSemanticError):
+    """Writable state authority was used as an ordinary Elanu value."""
 
 
 class WritableAuthorityInDerived(WritableAuthorityError):
@@ -55,7 +55,7 @@ class Dependency:
 
 
 def _state_equivalent(left: Any, right: Any) -> bool:
-    """Semantic equivalence used for Meld state-change detection.
+    """Semantic equivalence used for Elanu state-change detection.
 
     This is intentionally distinct from the language's eventual `==` operator.
     In particular, NaN is equivalent to NaN for state invalidation, and nested
@@ -69,7 +69,7 @@ def _state_equivalent(left: Any, right: Any) -> bool:
     if isinstance(left, float) and isinstance(right, float):
         if isnan(left) and isnan(right):
             return True
-        # Python already treats +0.0 and -0.0 as equal, matching Meld's rule.
+        # Python already treats +0.0 and -0.0 as equal, matching Elanu's rule.
         return left == right
 
     if type(left) is not type(right):
@@ -108,7 +108,7 @@ def _state_equivalent(left: Any, right: Any) -> bool:
 
 
 def _value_copy(value: T) -> T:
-    """Model Meld value semantics using defensive copies in Python.
+    """Model Elanu value semantics using defensive copies in Python.
 
     This is a semantic convenience for the prototype, not a proposed runtime
     strategy. A real compiler can use immutable values, ownership, copy-on-write,
@@ -161,7 +161,7 @@ class State(Generic[T], Dependency):
 class WritableState(Generic[T]):
     """Explicit authority to read and write one specific State slot.
 
-    Writable authority is not an ordinary Meld value. It exists to model
+    Writable authority is not an ordinary Elanu value. It exists to model
     explicit caller-granted mutation authority for action parameters.
     """
 
@@ -188,7 +188,7 @@ class WritableState(Generic[T]):
     def __deepcopy__(self, memo: dict[int, object]) -> "WritableState[T]":
         del memo
         raise WritableAuthorityError(
-            "writable state authority is not an ordinary Meld value"
+            "writable state authority is not an ordinary Elanu value"
         )
 
 

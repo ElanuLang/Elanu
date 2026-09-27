@@ -1537,7 +1537,7 @@ The current compiler still contains bootstrap mechanisms including preprocessing
 
 Unless this reference explicitly states otherwise, those mechanisms are implementation details.
 
-A Elanu programmer should reason from the source semantics described here, not from names such as generated `__meld_*` bindings, private builtin names, or current compiler pass order.
+A Elanu programmer should reason from the source semantics described here, not from names such as generated `__elanu_*` bindings, private builtin names, or current compiler pass order.
 
 ---
 

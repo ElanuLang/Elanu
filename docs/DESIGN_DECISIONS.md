@@ -34,7 +34,7 @@ The pre-1.0 public language, compiler/package/binary identity, current documenta
 
 The canonical source-file extension is `.elnu`. The current compiler does not enforce a filename extension; this is a project/tooling convention rather than a parsing or runtime semantic rule.
 
-Generated `__meld_*` names and similar private encodings remain bootstrap implementation representation. This naming decision does not rename them or promote them into language semantics.
+Generated `__elanu_*` names and similar private encodings remain bootstrap implementation representation. This naming decision does not rename them or promote them into language semantics.
 
 ## `state`, `derived`, and `action` are distinct semantic roles
 

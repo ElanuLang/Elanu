@@ -53,7 +53,7 @@ action manuallySynchronizeDisplayOrder {
 
     assert_eq!(
         runtime
-            .value("__meld_filter_member$board$visibleTickets")
+            .value("__elanu_filter_member$board$visibleTickets")
             .unwrap(),
         Value::Sequence {
             element_model: "Ticket".to_string(),
@@ -71,7 +71,7 @@ action manuallySynchronizeDisplayOrder {
 
     assert_eq!(
         runtime
-            .value("__meld_filter_member$board$visibleTickets")
+            .value("__elanu_filter_member$board$visibleTickets")
             .unwrap(),
         Value::Sequence {
             element_model: "Ticket".to_string(),
@@ -90,7 +90,7 @@ action manuallySynchronizeDisplayOrder {
 
     assert_eq!(
         runtime
-            .value("__meld_filter_member$board$visibleTickets")
+            .value("__elanu_filter_member$board$visibleTickets")
             .unwrap(),
         Value::Sequence {
             element_model: "Ticket".to_string(),
@@ -151,7 +151,7 @@ action closeB {
 
     assert_eq!(
         runtime
-            .value("__meld_filter_member$board$visibleTickets")
+            .value("__elanu_filter_member$board$visibleTickets")
             .unwrap(),
         Value::Sequence {
             element_model: "Ticket".to_string(),
@@ -165,7 +165,7 @@ action closeB {
     );
     assert_eq!(
         runtime
-            .value("__meld_filter_member$board$ascendingTickets")
+            .value("__elanu_filter_member$board$ascendingTickets")
             .unwrap(),
         Value::Sequence {
             element_model: "Ticket".to_string(),
@@ -177,7 +177,7 @@ action closeB {
         },
     );
     assert_eq!(
-        runtime.value("__meld_mseq$board$tickets").unwrap(),
+        runtime.value("__elanu_mseq$board$tickets").unwrap(),
         Value::Sequence {
             element_model: "Ticket".to_string(),
             targets: vec![
@@ -195,7 +195,7 @@ action closeB {
 
     assert_eq!(
         runtime
-            .value("__meld_filter_member$board$visibleTickets")
+            .value("__elanu_filter_member$board$visibleTickets")
             .unwrap(),
         Value::Sequence {
             element_model: "Ticket".to_string(),
@@ -208,7 +208,7 @@ action closeB {
         "ordered view must react to current child ordering facts",
     );
     assert_eq!(
-        runtime.value("__meld_mseq$board$tickets").unwrap(),
+        runtime.value("__elanu_mseq$board$tickets").unwrap(),
         Value::Sequence {
             element_model: "Ticket".to_string(),
             targets: vec![
@@ -225,7 +225,7 @@ action closeB {
         .expect("membership fact should commit");
     assert_eq!(
         runtime
-            .value("__meld_filter_member$board$visibleTickets")
+            .value("__elanu_filter_member$board$visibleTickets")
             .unwrap(),
         Value::Sequence {
             element_model: "Ticket".to_string(),

@@ -9,7 +9,7 @@ use crate::semantic::{
     assignable_to, binary_result_type, common_type, show_type, types_compatible, ValueType,
 };
 
-const MODEL_SEQUENCE_BINDING_PREFIX: &str = "__meld_mseq$";
+const MODEL_SEQUENCE_BINDING_PREFIX: &str = "__elanu_mseq$";
 
 /// Type owner-relative runtime reductions without choosing a representative
 /// concrete live target.
@@ -17,7 +17,7 @@ const MODEL_SEQUENCE_BINDING_PREFIX: &str = "__meld_mseq$";
 /// The initial expression establishes the stable accumulator/result type. The
 /// step is then checked with that accumulator type, the element model schema,
 /// and the owner model's ordinary member schema. Each step result must be
-/// assignable back to the accumulator type under ordinary Meld rules.
+/// assignable back to the accumulator type under ordinary Elanu rules.
 pub(crate) fn check(program: &Program) -> Result<HashMap<String, ValueType>, Vec<Diagnostic>> {
     let model_types = model_types::resolve(&program.state_models)?;
     let owner_roots = collect_owner_roots(program);

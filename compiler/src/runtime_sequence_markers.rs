@@ -1,5 +1,5 @@
-pub const RUNTIME_SEQUENCE_TYPE_PREFIX: &str = "__meld_runtime_sequence_live$";
-const RUNTIME_SEQUENCE_VALUE_PREFIX: &str = "__meld_runtime_sequence_value$";
+pub const RUNTIME_SEQUENCE_TYPE_PREFIX: &str = "__elanu_runtime_sequence_live$";
+const RUNTIME_SEQUENCE_VALUE_PREFIX: &str = "__elanu_runtime_sequence_value$";
 
 pub fn encode_runtime_sequence_type(model: &str) -> String {
     format!("{RUNTIME_SEQUENCE_TYPE_PREFIX}{model}")

@@ -13,8 +13,8 @@ use crate::scoped_create_surface::INSERT_SCOPE_MARKER_ACTION;
 use crate::semantic::ValueType;
 
 pub(crate) const GENERATED_EXISTING_INSERT_ACTION_PREFIX: &str =
-    "__meld_create_scope_insert_existing_";
-const FINALIZED_EXISTING_INSERT_ACTION_PREFIX: &str = "__meld_create_scope_insert_persistent_";
+    "__elanu_create_scope_insert_existing_";
+const FINALIZED_EXISTING_INSERT_ACTION_PREFIX: &str = "__elanu_create_scope_insert_persistent_";
 
 /// Validate residual `insert designation into owner.membership` markers after scoped-create
 /// and scoped-designation lowering, then preserve them until live-designation lowering has
