@@ -10,8 +10,8 @@
 //! ```
 //!
 //! Nested action calls share one transaction, so the second segment must see the
-//! selection staged by the first. This file records what the current merged
-//! runtime does in a fully resident world versus a reopened world where
+//! selection staged by the first. This pressure experiment verifies that the same
+//! source behavior remains valid in a fully resident world and after restart when
 //! intermediate folder payloads are dormant.
 
 use std::collections::HashMap;
@@ -32,6 +32,7 @@ const CABINET: &str = include_str!("../../examples/cabinet.elnu");
 /// ordinary indexing.
 const ROUTE: &str = r#"
 state observedIntermediate = ""
+state observedIndexedChildName = ""
 
 action selectRoute(first: Int, second: Int, third: Int, depth: Int) {
     selectHome()
@@ -57,6 +58,10 @@ action selectRouteRecordingIntermediate(first: Int, second: Int) {
     selectFolder(first)
     observedIntermediate = selectedFolderName
     selectFolder(second)
+}
+
+action readIndexedChildName(index: Int) {
+    observedIndexedChildName = selectedFolder.folders[index].name
 }
 "#;
 
@@ -304,6 +309,55 @@ fn restarted_route_borrows_without_changing_residency() {
     );
 }
 
+/// Indexed child-member reads have the same residency independence as direct
+/// designation-relative member reads. The starting owner is resident, while the
+/// child selected by index remains dormant until the action needs its stored member.
+#[test]
+fn restarted_indexed_member_read_borrows_child_without_promoting_residency() {
+    let (checked, initial) = seeded();
+    let provider = initial.into_provider();
+    let mut restarted =
+        PartialPersistentRuntime::open(checked, provider).expect("restart should open");
+    assert_eq!(restarted.dormant_backing_keys().len(), 4);
+
+    restarted
+        .materialize_designation("selectedFolder")
+        .expect("starting folder should materialize for the indexed-member control");
+    assert_eq!(
+        restarted.dormant_backing_keys().len(),
+        3,
+        "only the starting folder should be resident before the action"
+    );
+
+    restarted
+        .run_action_with_values("readIndexedChildName", &[Value::Int(0)])
+        .expect("indexed child-member read should borrow the dormant child");
+
+    assert_eq!(
+        restarted.value("observedIndexedChildName").unwrap(),
+        Value::String("Projects".into())
+    );
+    assert_eq!(
+        restarted.dormant_backing_keys().len(),
+        3,
+        "reading the indexed child must not promote its residency"
+    );
+
+    let provider = restarted.into_provider();
+    assert_eq!(
+        provider.loads.len(),
+        2,
+        "one explicit owner load plus one transaction-local child load"
+    );
+    assert_ne!(
+        provider.loads[0], provider.loads[1],
+        "the explicit owner and indexed child must be distinct identities"
+    );
+    assert_eq!(
+        provider.commits, 5,
+        "the indexed-member read action should publish exactly one candidate"
+    );
+}
 /// The route is still one atomic transition across dormancy.
 #[test]
 fn restarted_route_invalid_later_segment_rolls_back_whole_route() {

@@ -117,9 +117,11 @@ impl RuntimeError {
         }
     }
 
-    fn dormant_designation_member(identity: String, member: String, state_name: String) -> Self {
+    fn dormant_designation_member(identity: String, member: String) -> Self {
         Self {
-            message: format!("unknown scoped insertion target state '{state_name}'"),
+            message: format!(
+                "dormant modeled member '{identity}.{member}' requires materialization"
+            ),
             detail: RuntimeErrorDetail::DormantDesignationMember { identity, member },
         }
     }
@@ -1466,7 +1468,6 @@ impl Runtime {
                         return Err(RuntimeError::dormant_designation_member(
                             dormant_owner,
                             member,
-                            target,
                         ));
                     }
                 }
@@ -2600,7 +2601,6 @@ impl Runtime {
             return Err(RuntimeError::dormant_designation_member(
                 identity.to_string(),
                 member.to_string(),
-                name,
             ));
         }
         self.read_name(&name, owner)

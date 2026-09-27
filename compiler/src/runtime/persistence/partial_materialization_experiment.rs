@@ -460,7 +460,7 @@ fn dormant_identity_representation_preserves_exact_world_and_materializes_in_pla
         .value("coldName")
         .expect_err("dormant member access must fail rather than fabricate defaults");
     assert!(
-        cold_read_error.message.contains("unknown") || cold_read_error.message.contains("missing"),
+        cold_read_error.message.contains("requires materialization"),
         "unexpected dormant read failure: {}",
         cold_read_error.message
     );
