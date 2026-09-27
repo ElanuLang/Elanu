@@ -3,8 +3,10 @@ use std::{
     error::Error,
     fs::{self, File},
     io::{self, Cursor, Read, Write},
+    net::{TcpListener, TcpStream},
     path::PathBuf,
     sync::{Arc, Mutex},
+    thread,
 };
 
 use elanu_compiler::{
@@ -19,6 +21,7 @@ use elanu_compiler::{
 const SOURCE: &str = include_str!("../../examples/cabinet.elnu");
 const SNAPSHOT_MAGIC: &[u8; 8] = b"ELANCAB1";
 const SNAPSHOT_VERSION: u32 = 1;
+const BROWSER_ADDR: &str = "127.0.0.1:7878";
 
 type CabinetRuntime = PartialPersistentRuntime<DirectoryProvider>;
 type SharedCabinetRuntime = Arc<Mutex<CabinetRuntime>>;
@@ -45,15 +48,19 @@ fn main() -> AppResult<()> {
     )?));
 
     with_runtime(&runtime, |runtime| -> AppResult<()> {
-        if bool_value(runtime, "initialized")? {
-            materialize_visible(runtime)?;
-        } else {
+        if !bool_value(runtime, "initialized")? {
             runtime.run_action("initialize")?;
         }
+
+        materialize_visible(runtime)?;
         Ok(())
     })?;
 
-    let mut status = String::from("Notes Cabinet opened.");
+    start_browser_bridge(Arc::clone(&runtime))?;
+
+    println!("Browser view: http://{BROWSER_ADDR}");
+
+    let mut status = format!("Notes Cabinet opened. Browser view: http://{BROWSER_ADDR}");
 
     loop {
         with_runtime(&runtime, |runtime| render(runtime, &status))?;
@@ -100,6 +107,313 @@ fn with_runtime<T>(
         .lock()
         .expect("Cabinet runtime mutex should not be poisoned");
     operation(&mut runtime)
+}
+
+fn start_browser_bridge(shared: SharedCabinetRuntime) -> io::Result<()> {
+    let listener = TcpListener::bind(BROWSER_ADDR)?;
+
+    thread::spawn(move || {
+        for incoming in listener.incoming() {
+            match incoming {
+                Ok(stream) => {
+                    if let Err(error) = handle_browser_request(&shared, stream) {
+                        eprintln!("Cabinet browser request failed: {error}");
+                    }
+                }
+                Err(error) => {
+                    eprintln!("Cabinet browser connection failed: {error}");
+                }
+            }
+        }
+    });
+
+    Ok(())
+}
+
+fn handle_browser_request(shared: &SharedCabinetRuntime, mut stream: TcpStream) -> io::Result<()> {
+    let mut request = [0u8; 4096];
+    let read = stream.read(&mut request)?;
+
+    if read == 0 {
+        return Ok(());
+    }
+
+    let request = String::from_utf8_lossy(&request[..read]);
+    let request_line = request.lines().next().unwrap_or_default();
+
+    let mut parts = request_line.split_whitespace();
+    let method = parts.next().unwrap_or_default();
+    let path = parts.next().unwrap_or_default();
+
+    match (method, path) {
+        ("GET", "/") | ("GET", "/index.html") => {
+            let page = with_runtime(shared, browser_page);
+
+            match page {
+                Ok(body) => {
+                    write_http_response(&mut stream, "200 OK", "text/html; charset=utf-8", &body)
+                }
+                Err(error) => write_http_response(
+                    &mut stream,
+                    "500 Internal Server Error",
+                    "text/plain; charset=utf-8",
+                    &format!("Cabinet observation failed: {error}"),
+                ),
+            }
+        }
+
+        ("GET", "/favicon.ico") => {
+            write_http_response(&mut stream, "204 No Content", "text/plain", "")
+        }
+
+        ("GET", _) => write_http_response(
+            &mut stream,
+            "404 Not Found",
+            "text/plain; charset=utf-8",
+            "Not found.",
+        ),
+
+        _ => write_http_response(
+            &mut stream,
+            "405 Method Not Allowed",
+            "text/plain; charset=utf-8",
+            "Only GET is supported by this read-only Cabinet bridge.",
+        ),
+    }
+}
+
+fn write_http_response(
+    stream: &mut TcpStream,
+    status: &str,
+    content_type: &str,
+    body: &str,
+) -> io::Result<()> {
+    let body = body.as_bytes();
+
+    write!(
+        stream,
+        "HTTP/1.1 {status}\r\n\
+         Content-Type: {content_type}\r\n\
+         Content-Length: {}\r\n\
+         Cache-Control: no-store\r\n\
+         Connection: close\r\n\
+         \r\n",
+        body.len()
+    )?;
+
+    stream.write_all(body)?;
+    stream.flush()
+}
+
+fn browser_page(runtime: &mut CabinetRuntime) -> AppResult<String> {
+    let folder = string_value(runtime, "selectedFolderName")?;
+    let note_present = bool_value(runtime, "selectedNotePresent")?;
+
+    let note_title = if note_present {
+        string_value(runtime, "selectedNoteTitle")?
+    } else {
+        String::new()
+    };
+
+    let note_body = if note_present {
+        string_value(runtime, "selectedNoteBody")?
+    } else {
+        String::new()
+    };
+
+    let in_trash = if note_present {
+        bool_value(runtime, "selectedNoteInTrash")?
+    } else {
+        false
+    };
+
+    let folders = designation_member_strings(runtime, "selectedFolder", "folders", "name")?;
+    let notes = designation_member_strings(runtime, "selectedFolder", "notes", "title")?;
+
+    let mut contents = String::new();
+
+    if folders.is_empty() && notes.is_empty() {
+        contents.push_str("<li class=\"empty\">&lt;empty&gt;</li>");
+    } else {
+        for (index, name) in folders.iter().enumerate() {
+            contents.push_str(&format!(
+                "<li><span class=\"index\">f{index}</span> 📁 {}/</li>",
+                escape_html(name)
+            ));
+        }
+
+        for (index, title) in notes.iter().enumerate() {
+            contents.push_str(&format!(
+                "<li><span class=\"index\">n{index}</span> 📝 {}</li>",
+                escape_html(title)
+            ));
+        }
+    }
+
+    let selected_note = if note_present {
+        let trash_badge = if in_trash {
+            "<span class=\"badge\">TRASHED</span>"
+        } else {
+            ""
+        };
+
+        format!(
+            r#"
+            <section>
+                <h2>Selected note</h2>
+                <h3>{title} {trash_badge}</h3>
+                <pre>{body}</pre>
+            </section>
+            "#,
+            title = escape_html(&note_title),
+            body = escape_html(&note_body),
+        )
+    } else {
+        String::from(
+            r#"
+            <section>
+                <h2>Selected note</h2>
+                <p class="empty">&lt;none selected&gt;</p>
+            </section>
+            "#,
+        )
+    };
+
+    Ok(format!(
+        r#"<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Elanu Notes Cabinet</title>
+    <style>
+        :root {{
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            color-scheme: light dark;
+        }}
+
+        body {{
+            max-width: 900px;
+            margin: 3rem auto;
+            padding: 0 1.5rem;
+            line-height: 1.5;
+        }}
+
+        header {{
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 1rem;
+            border-bottom: 1px solid;
+            padding-bottom: 1rem;
+            margin-bottom: 2rem;
+        }}
+
+        h1, h2, h3 {{
+            margin-top: 0;
+        }}
+
+        section {{
+            margin: 2rem 0;
+        }}
+
+        ul {{
+            list-style: none;
+            padding: 0;
+        }}
+
+        li {{
+            padding: 0.35rem 0;
+        }}
+
+        .index {{
+            display: inline-block;
+            min-width: 2.5rem;
+            opacity: 0.65;
+            font-family: monospace;
+        }}
+
+        .badge {{
+            font-size: 0.7rem;
+            border: 1px solid;
+            border-radius: 0.3rem;
+            padding: 0.15rem 0.35rem;
+            margin-left: 0.5rem;
+        }}
+
+        .empty {{
+            opacity: 0.65;
+        }}
+
+        pre {{
+            white-space: pre-wrap;
+            font: inherit;
+            padding: 1rem;
+            border: 1px solid;
+            border-radius: 0.4rem;
+        }}
+
+        a {{
+            white-space: nowrap;
+        }}
+
+        footer {{
+            border-top: 1px solid;
+            margin-top: 3rem;
+            padding-top: 1rem;
+            opacity: 0.65;
+            font-size: 0.9rem;
+        }}
+    </style>
+</head>
+<body>
+    <header>
+        <div>
+            <h1>Elanu Notes Cabinet</h1>
+            <div>Read-only browser surface</div>
+        </div>
+        <a href="/">Refresh</a>
+    </header>
+
+    <main>
+        <section>
+            <h2>Selected folder</h2>
+            <h3>{folder}</h3>
+
+            <ul>
+                {contents}
+            </ul>
+        </section>
+
+        {selected_note}
+    </main>
+
+    <footer>
+        One native Elanu runtime. This page observes the same committed Cabinet
+        state as the terminal surface.
+    </footer>
+</body>
+</html>
+"#,
+        folder = escape_html(&folder),
+    ))
+}
+
+fn escape_html(value: &str) -> String {
+    let mut escaped = String::with_capacity(value.len());
+
+    for character in value.chars() {
+        match character {
+            '&' => escaped.push_str("&amp;"),
+            '<' => escaped.push_str("&lt;"),
+            '>' => escaped.push_str("&gt;"),
+            '"' => escaped.push_str("&quot;"),
+            '\'' => escaped.push_str("&#39;"),
+            other => escaped.push(other),
+        }
+    }
+
+    escaped
 }
 
 fn checked_source() -> AppResult<CheckedSource> {
