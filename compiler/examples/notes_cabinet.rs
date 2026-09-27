@@ -260,7 +260,10 @@ fn read_http_request(stream: &mut TcpStream) -> io::Result<String> {
     }
 
     let header_end = find_header_end(&bytes).ok_or_else(|| {
-        io::Error::new(io::ErrorKind::UnexpectedEof, "incomplete HTTP request headers")
+        io::Error::new(
+            io::ErrorKind::UnexpectedEof,
+            "incomplete HTTP request headers",
+        )
     })?;
     let total = expected_total.unwrap_or(header_end + 4);
     if bytes.len() < total {
@@ -318,7 +321,9 @@ fn invoke_browser_action(shared: &SharedCabinetRuntime, body: &str) -> Result<()
             })
         }
         "selectHome" | "openTrash" => with_runtime(shared, |runtime| {
-            runtime.run_action(action).map_err(|error| error.to_string())?;
+            runtime
+                .run_action(action)
+                .map_err(|error| error.to_string())?;
             materialize_visible(runtime).map_err(|error| error.to_string())
         }),
         "editSelectedNote" => {
