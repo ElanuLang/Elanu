@@ -98,14 +98,38 @@ pub struct SnapshotEntry {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+enum RuntimeErrorDetail {
+    Generic,
+    DormantDesignationMember { identity: String, member: String },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RuntimeError {
     pub message: String,
+    detail: RuntimeErrorDetail,
 }
 
 impl RuntimeError {
     pub fn new(message: impl Into<String>) -> Self {
         Self {
             message: message.into(),
+            detail: RuntimeErrorDetail::Generic,
+        }
+    }
+
+    fn dormant_designation_member(identity: String, member: String, state_name: String) -> Self {
+        Self {
+            message: format!("unknown scoped insertion target state '{state_name}'"),
+            detail: RuntimeErrorDetail::DormantDesignationMember { identity, member },
+        }
+    }
+
+    pub(crate) fn dormant_designation_member_request(&self) -> Option<(&str, &str)> {
+        match &self.detail {
+            RuntimeErrorDetail::DormantDesignationMember { identity, member } => {
+                Some((identity, member))
+            }
+            RuntimeErrorDetail::Generic => None,
         }
     }
 }
@@ -146,6 +170,7 @@ struct DerivedCell {
 #[derive(Debug, Default)]
 struct Transaction {
     writes: HashMap<String, Value>,
+    borrowed_states: HashMap<String, StateCell>,
     derived_values: HashMap<String, Value>,
     derived_dependencies: HashMap<String, HashSet<String>>,
     dependents: HashMap<String, HashSet<String>>,
@@ -1401,7 +1426,8 @@ impl Runtime {
             }
         };
 
-        let target = self.resolve_state_grant(target)?;
+        let target_grant = target;
+        let target = self.resolve_state_grant(target_grant)?;
 
         let expected_model = match self.state_type(&target) {
             Some(ValueType::SequenceLive(model)) => model,
@@ -1412,9 +1438,42 @@ impl Runtime {
                 )))
             }
             None => {
+                if let Some(Expr::RuntimeDesignationMember {
+                    designation,
+                    member,
+                    ..
+                }) = self.runtime_index_grant_carriers.get(target_grant).cloned()
+                {
+                    let dormant_owner = match self.eval_expr(designation.as_ref(), None)? {
+                        Value::String(owner) if !owner.is_empty() => owner,
+                        Value::String(_) => {
+                            return Err(RuntimeError::new("live designation has no target"))
+                        }
+                        other => {
+                            return Err(RuntimeError::new(format!(
+                                "runtime designation grant must resolve to live identity, got {}",
+                                other.type_name()
+                            )))
+                        }
+                    };
+
+                    let target_deleted = self
+                        .transaction
+                        .as_ref()
+                        .is_some_and(|transaction| transaction.deleted_states.contains(&target));
+
+                    if !target_deleted && self.dynamic_model_types.contains_key(&dormant_owner) {
+                        return Err(RuntimeError::dormant_designation_member(
+                            dormant_owner,
+                            member,
+                            target,
+                        ));
+                    }
+                }
+
                 return Err(RuntimeError::new(format!(
                     "unknown scoped insertion target state '{target}'"
-                )))
+                )));
             }
         };
 
@@ -2528,10 +2587,10 @@ impl Runtime {
             return false;
         }
         self.states.contains_key(name)
-            || self
-                .transaction
-                .as_ref()
-                .is_some_and(|transaction| transaction.created_states.contains_key(name))
+            || self.transaction.as_ref().is_some_and(|transaction| {
+                transaction.created_states.contains_key(name)
+                    || transaction.borrowed_states.contains_key(name)
+            })
     }
 
     fn derived_exists(&self, name: &str) -> bool {
@@ -2559,7 +2618,12 @@ impl Runtime {
         }
         self.transaction
             .as_ref()
-            .and_then(|transaction| transaction.created_states.get(name))
+            .and_then(|transaction| {
+                transaction
+                    .created_states
+                    .get(name)
+                    .or_else(|| transaction.borrowed_states.get(name))
+            })
             .or_else(|| self.states.get(name))
             .map(|cell| cell.value_type.clone())
     }
@@ -2583,6 +2647,15 @@ impl Runtime {
             .transaction
             .as_ref()
             .and_then(|transaction| transaction.created_states.get(name))
+            .map(|cell| cell.value.clone())
+        {
+            return Ok(value);
+        }
+
+        if let Some(value) = self
+            .transaction
+            .as_ref()
+            .and_then(|transaction| transaction.borrowed_states.get(name))
             .map(|cell| cell.value.clone())
         {
             return Ok(value);

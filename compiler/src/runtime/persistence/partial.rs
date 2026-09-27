@@ -32,6 +32,12 @@ struct BackingHandle {
     resident_baseline: Option<Vec<u8>>,
 }
 
+#[derive(Debug, Clone)]
+struct ActionLocalBacking {
+    values: HashMap<String, Value>,
+    payload: Vec<u8>,
+}
+
 /// Production runtime wrapper for durable worlds whose dynamic modeled state
 /// may remain outside process memory until explicitly materialized.
 ///
@@ -87,10 +93,10 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
         keys
     }
 
-    /// Materialize the exact modeled identity currently carried by one
-    /// top-level source designation. The host names application state, while
-    /// dynamic identity and backing-key correlation remain runtime-private.
-    pub fn materialize_designation(&mut self, designation: &str) -> Result<(), RuntimeError> {
+    fn designation_identity_and_handle(
+        &self,
+        designation: &str,
+    ) -> Result<(String, BackingHandle), RuntimeError> {
         let lowered = self
             .checked
             .runtime_designation_bindings
@@ -125,13 +131,151 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
                 )));
             }
         };
-        let handle = self.backed.get(&identity).ok_or_else(|| {
+        let handle = self.backed.get(&identity).cloned().ok_or_else(|| {
             RuntimeError::new(format!(
                 "live designation '{designation}' targets an identity without partial-persistence backing"
             ))
         })?;
-        let key = encode_key(handle.token);
-        self.materialize(&key)
+        Ok((identity, handle))
+    }
+
+    /// Materialize the exact modeled identity currently carried by one
+    /// top-level source designation. The host names application state, while
+    /// dynamic identity and backing-key correlation remain runtime-private.
+    pub fn materialize_designation(&mut self, designation: &str) -> Result<(), RuntimeError> {
+        let (_, handle) = self.designation_identity_and_handle(designation)?;
+        self.materialize(&encode_key(handle.token))
+    }
+
+    /// Return the number of current occurrences in one stored `[live T]`
+    /// member of the model currently carried by a top-level designation.
+    ///
+    /// The observation explicitly materializes the designated owner as needed.
+    /// Dynamic identities remain runtime-private.
+    pub fn designation_member_len(
+        &mut self,
+        designation: &str,
+        member: &str,
+    ) -> Result<usize, RuntimeError> {
+        let (_, targets) = self.designation_sequence_targets(designation, member)?;
+        Ok(targets.len())
+    }
+
+    /// Observe one primitive stored member of the child at a current
+    /// occurrence in a designation-owned `[live T]` sequence.
+    ///
+    /// The selected child is explicitly materialized as part of this
+    /// observation. Structural sequences and live designations are rejected so
+    /// runtime identity never crosses this host boundary.
+    pub fn designation_member_index_value(
+        &mut self,
+        designation: &str,
+        member: &str,
+        index: usize,
+        child_member: &str,
+    ) -> Result<Value, RuntimeError> {
+        let (expected_model, targets) = self.designation_sequence_targets(designation, member)?;
+        let identity = targets.get(index).cloned().ok_or_else(|| {
+            RuntimeError::new(format!(
+                "designation member index {index} is out of bounds for '{designation}.{member}' of length {}",
+                targets.len()
+            ))
+        })?;
+
+        let handle = self.backed.get(&identity).cloned().ok_or_else(|| {
+            RuntimeError::new(format!(
+                "selected identity from '{designation}.{member}[{index}]' has no partial-persistence backing"
+            ))
+        })?;
+        if handle.model_name != expected_model {
+            return Err(RuntimeError::new(format!(
+                "selected identity from '{designation}.{member}[{index}]' has model '{}' but sequence expects '{expected_model}'",
+                handle.model_name
+            )));
+        }
+
+        let child_metadata = stored_members(&self.checked, &handle)?
+            .into_iter()
+            .find(|candidate| candidate.name == child_member)
+            .ok_or_else(|| {
+                RuntimeError::new(format!(
+                    "state model '{}' has no stored member '{child_member}'",
+                    handle.model_name
+                ))
+            })?;
+        if child_metadata.designation.is_some()
+            || matches!(&child_metadata.value_type, ValueType::SequenceLive(_))
+        {
+            return Err(RuntimeError::new(format!(
+                "host observation '{designation}.{member}[{index}].{child_member}' must name primitive stored state"
+            )));
+        }
+
+        self.materialize(&encode_key(handle.token))?;
+        let values = runtime_backing_values(&self.checked, &self.runtime, &identity, &handle)?;
+        let value = values.get(child_member).cloned().ok_or_else(|| {
+            RuntimeError::new(format!(
+                "resident backed identity '{identity}' is missing state '{child_member}'"
+            ))
+        })?;
+
+        match value {
+            Value::Int(_) | Value::Float(_) | Value::Bool(_) | Value::String(_) => Ok(value),
+            Value::Sequence { .. } => Err(RuntimeError::new(format!(
+                "host observation '{designation}.{member}[{index}].{child_member}' exposed structural identity"
+            ))),
+        }
+    }
+
+    fn designation_sequence_targets(
+        &mut self,
+        designation: &str,
+        member: &str,
+    ) -> Result<(String, Vec<String>), RuntimeError> {
+        self.materialize_designation(designation)?;
+        let (identity, handle) = self.designation_identity_and_handle(designation)?;
+
+        let member_metadata = stored_members(&self.checked, &handle)?
+            .into_iter()
+            .find(|candidate| candidate.name == member)
+            .ok_or_else(|| {
+                RuntimeError::new(format!(
+                    "state model '{}' has no stored member '{member}'",
+                    handle.model_name
+                ))
+            })?;
+        let expected_model = match &member_metadata.value_type {
+            ValueType::SequenceLive(model) => model.clone(),
+            other => {
+                return Err(RuntimeError::new(format!(
+                    "designation member '{designation}.{member}' must be [live T], got {}",
+                    show_type(other)
+                )));
+            }
+        };
+
+        let values = runtime_backing_values(&self.checked, &self.runtime, &identity, &handle)?;
+        let current = values.get(member).cloned().ok_or_else(|| {
+            RuntimeError::new(format!(
+                "resident backed identity '{identity}' is missing state '{member}'"
+            ))
+        })?;
+        let Value::Sequence {
+            element_model,
+            targets,
+        } = current
+        else {
+            return Err(RuntimeError::new(format!(
+                "designation member '{designation}.{member}' is not structural membership"
+            )));
+        };
+        if element_model != expected_model {
+            return Err(RuntimeError::new(format!(
+                "designation member '{designation}.{member}' contains live {element_model} but expects live {expected_model}"
+            )));
+        }
+
+        Ok((expected_model, targets))
     }
 
     /// Materialize the exact child identity at one current occurrence of a
@@ -299,6 +443,44 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
         self.run_action_with_arguments(name, &arguments)
     }
 
+    fn load_action_local_backing(
+        &mut self,
+        identity: &str,
+        requested_member: &str,
+    ) -> Result<ActionLocalBacking, RuntimeError> {
+        let handle = self.backed.get(identity).cloned().ok_or_else(|| {
+            RuntimeError::new(format!(
+                "dormant designation target '{identity}' has no partial-persistence backing"
+            ))
+        })?;
+
+        if !stored_members(&self.checked, &handle)?
+            .iter()
+            .any(|member| member.name == requested_member)
+        {
+            return Err(RuntimeError::new(format!(
+                "dormant designation target '{identity}' has no stored member '{requested_member}'"
+            )));
+        }
+
+        let key = encode_key(handle.token);
+        let payload = self
+            .provider
+            .load_backing(&key)?
+            .ok_or_else(|| RuntimeError::new("missing partial-persistence backing payload"))?;
+        let values = decode_backing(&self.checked, identity, &handle, &payload)?;
+
+        let cleanup_targets =
+            termination_cleanup_targets_from_values(&self.checked, &handle, &values)?;
+        if cleanup_targets != handle.termination_cleanup_targets {
+            return Err(RuntimeError::new(format!(
+                "partial-persistence termination-cleanup summary for '{identity}' does not match backing"
+            )));
+        }
+
+        Ok(ActionLocalBacking { values, payload })
+    }
+
     fn run_action_with_arguments(
         &mut self,
         name: &str,
@@ -316,20 +498,63 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
         let prior_backed = self.backed.clone();
         let prior_next_backing_token = self.next_backing_token;
 
-        self.runtime.transaction = Some(Transaction::default());
-        let result = self.runtime.invoke_action(name, arguments);
-        let transaction = match result {
-            Ok(()) => self
-                .runtime
-                .transaction
-                .take()
-                .expect("successful partial persistent action should retain its transaction"),
-            Err(error) => {
-                self.runtime.transaction = None;
-                self.runtime.next_dynamic_identity = prior_next_dynamic_identity;
-                return Err(error);
+        let mut action_local_backings = HashMap::<String, ActionLocalBacking>::new();
+
+        let mut transaction = loop {
+            self.runtime.transaction = Some(Transaction::default());
+
+            for (identity, action_local) in &action_local_backings {
+                let handle = prior_backed
+                    .get(identity)
+                    .expect("action-local identity should retain its backing");
+                borrow_backing_states_into_transaction(
+                    &self.checked,
+                    &mut self.runtime,
+                    identity,
+                    handle,
+                    &action_local.values,
+                )?;
+            }
+
+            match self.runtime.invoke_action(name, arguments) {
+                Ok(()) => {
+                    break self.runtime.transaction.take().expect(
+                        "successful partial persistent action should retain its transaction",
+                    );
+                }
+                Err(error) => {
+                    self.runtime.transaction = None;
+                    self.runtime.next_dynamic_identity = prior_next_dynamic_identity;
+
+                    let Some((identity, member)) = error
+                        .dormant_designation_member_request()
+                        .map(|(identity, member)| (identity.to_string(), member.to_string()))
+                    else {
+                        return Err(error);
+                    };
+
+                    if action_local_backings.contains_key(&identity) {
+                        return Err(error);
+                    }
+
+                    let backing = self.load_action_local_backing(&identity, &member)?;
+                    action_local_backings.insert(identity, backing);
+                }
             }
         };
+
+        for (identity, action_local) in &mut action_local_backings {
+            let handle = prior_backed
+                .get(identity)
+                .expect("action-local identity should retain its backing");
+
+            for member in stored_members(&self.checked, handle)? {
+                let name = model_binding_name(identity, &member.name);
+                if let Some(value) = transaction.writes.remove(&name) {
+                    action_local.values.insert(member.name.clone(), value);
+                }
+            }
+        }
 
         let terminated_model_identities = transaction.terminated_model_identities.clone();
         let candidate_next_dynamic_identity = self.runtime.next_dynamic_identity;
@@ -347,6 +572,32 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
         )?;
 
         let mut replacements = Vec::new();
+
+        for (identity, action_local) in &action_local_backings {
+            let handle = candidate_backed
+                .get(identity)
+                .cloned()
+                .expect("action-local identity should remain backed");
+
+            let payload =
+                encode_backing_values(&self.checked, identity, &handle, &action_local.values)?;
+            let cleanup_targets = termination_cleanup_targets_from_values(
+                &self.checked,
+                &handle,
+                &action_local.values,
+            )?;
+
+            if payload != action_local.payload {
+                upsert_backing_replacement(&mut replacements, encode_key(handle.token), payload);
+            }
+
+            let candidate_handle = candidate_backed
+                .get_mut(identity)
+                .expect("action-local identity should remain backed");
+            candidate_handle.termination_cleanup_targets = cleanup_targets;
+            candidate_handle.resident_baseline = None;
+        }
+
         if let Err(error) = self.rewrite_dormant_termination_cleanup(
             &candidate,
             &mut candidate_backed,
@@ -433,10 +684,12 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
                 .cloned()
                 .expect("affected dormant identity should remain backed");
             let key = encode_key(handle.token);
-            let payload = self
-                .provider
-                .load_backing(&key)?
-                .ok_or_else(|| RuntimeError::new("missing partial-persistence backing payload"))?;
+            let payload = match staged_backing_payload(replacements, &key) {
+                Some(payload) => payload.to_vec(),
+                None => self.provider.load_backing(&key)?.ok_or_else(|| {
+                    RuntimeError::new("missing partial-persistence backing payload")
+                })?,
+            };
             let mut values = decode_backing(&self.checked, &identity, &handle, &payload)?;
             let prior_targets =
                 termination_cleanup_targets_from_values(&self.checked, &handle, &values)?;
@@ -498,7 +751,7 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
                 )));
             }
             let replacement = encode_backing_values(&self.checked, &identity, &handle, &values)?;
-            replacements.push((key, replacement));
+            upsert_backing_replacement(replacements, key, replacement);
             candidate_backed
                 .get_mut(&identity)
                 .expect("affected dormant identity should remain backed")
@@ -518,6 +771,32 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
 
     pub fn into_provider(self) -> P {
         self.provider
+    }
+}
+
+fn staged_backing_payload<'a>(
+    replacements: &'a [(Vec<u8>, Vec<u8>)],
+    key: &[u8],
+) -> Option<&'a [u8]> {
+    replacements
+        .iter()
+        .rev()
+        .find(|(candidate, _)| candidate.as_slice() == key)
+        .map(|(_, payload)| payload.as_slice())
+}
+
+fn upsert_backing_replacement(
+    replacements: &mut Vec<(Vec<u8>, Vec<u8>)>,
+    key: Vec<u8>,
+    payload: Vec<u8>,
+) {
+    if let Some((_, existing)) = replacements
+        .iter_mut()
+        .find(|(candidate, _)| candidate == &key)
+    {
+        *existing = payload;
+    } else {
+        replacements.push((key, payload));
     }
 }
 
@@ -966,6 +1245,55 @@ fn install_member_values(
     Ok(())
 }
 
+fn borrow_backing_states_into_transaction(
+    checked: &CheckedSource,
+    runtime: &mut Runtime,
+    identity: &str,
+    handle: &BackingHandle,
+    values: &HashMap<String, Value>,
+) -> Result<(), RuntimeError> {
+    let mut borrowed = Vec::new();
+
+    for member in stored_members(checked, handle)? {
+        let name = model_binding_name(identity, &member.name);
+        let value = values.get(&member.name).cloned().ok_or_else(|| {
+            RuntimeError::new(format!(
+                "backing payload is missing '{identity}.{}'",
+                member.name
+            ))
+        })?;
+
+        borrowed.push((
+            name,
+            StateCell {
+                value,
+                value_type: member.value_type.clone(),
+                designation: member.designation.clone(),
+                dependents: HashSet::new(),
+            },
+        ));
+    }
+
+    let transaction = runtime
+        .transaction
+        .as_mut()
+        .ok_or_else(|| RuntimeError::new("action-local backing requires an active transaction"))?;
+
+    for (name, state) in borrowed {
+        if transaction
+            .borrowed_states
+            .insert(name.clone(), state)
+            .is_some()
+        {
+            return Err(RuntimeError::new(format!(
+                "action-local backing duplicated borrowed state '{name}'"
+            )));
+        }
+    }
+
+    Ok(())
+}
+
 fn restore_candidate_runtime(
     checked: &CheckedSource,
     shape: &PersistenceShape,
@@ -1216,6 +1544,30 @@ action failedRenameCold {
             Value::String("audited".into())
         );
         assert!(restarted.provider.loads.is_empty());
+    }
+
+    #[test]
+    fn designation_relative_observation_materializes_only_requested_children() {
+        let (checked, mut provider) = seeded_provider();
+        provider.loads.clear();
+        let mut runtime = PartialPersistentRuntime::open(checked, provider).unwrap();
+        let (folder_key, document_key) = keys_by_model(&runtime);
+
+        assert_eq!(
+            runtime
+                .designation_member_len("coldFolder", "documents")
+                .unwrap(),
+            1
+        );
+        assert_eq!(runtime.provider.loads, vec![folder_key.clone()]);
+
+        assert_eq!(
+            runtime
+                .designation_member_index_value("coldFolder", "documents", 0, "title",)
+                .unwrap(),
+            Value::String("Cold document".into())
+        );
+        assert_eq!(runtime.provider.loads, vec![folder_key, document_key]);
     }
 
     #[test]
