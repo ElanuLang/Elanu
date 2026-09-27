@@ -117,9 +117,11 @@ impl RuntimeError {
         }
     }
 
-    fn dormant_designation_member(identity: String, member: String, state_name: String) -> Self {
+    fn dormant_designation_member(identity: String, member: String) -> Self {
         Self {
-            message: format!("unknown scoped insertion target state '{state_name}'"),
+            message: format!(
+                "dormant modeled member '{identity}.{member}' requires materialization"
+            ),
             detail: RuntimeErrorDetail::DormantDesignationMember { identity, member },
         }
     }
@@ -1466,7 +1468,6 @@ impl Runtime {
                         return Err(RuntimeError::dormant_designation_member(
                             dormant_owner,
                             member,
-                            target,
                         ));
                     }
                 }
@@ -2320,7 +2321,7 @@ impl Runtime {
                 if target.is_empty() {
                     return Err(RuntimeError::new("live designation has no target"));
                 }
-                self.read_name(&model_binding_name(&target, member), owner)
+                self.read_designation_member(&target, member, owner)
             }
             Expr::RuntimeIndexMember {
                 source,
@@ -2335,7 +2336,7 @@ impl Runtime {
                     element_model,
                     owner,
                 )?;
-                self.read_name(&model_binding_name(&target, member), owner)
+                self.read_designation_member(&target, member, owner)
             }
             Expr::Filter {
                 source,
@@ -2576,6 +2577,61 @@ impl Runtime {
         }
 
         Err(RuntimeError::new(format!("unknown value '{name}'")))
+    }
+
+    /// Read one stored modeled-state member of an exact live identity.
+    ///
+    /// For an ordinary dynamic identity the member states are resident and this
+    /// is a plain resident read. At a host persistence boundary the runtime may
+    /// instead know the identity, its model, and its lifetime owner while that
+    /// identity's payload stays dormant. In that case the read is reported as a
+    /// structured dormant-designation-member request: the stored member, its
+    /// designation-relative name, and the exact identity are all preserved so the
+    /// persistence boundary can supply that one identity's backing for this
+    /// transaction and retry. No source fact is added, dropped, or reordered; the
+    /// request only carries the fact the read already needed.
+    fn read_designation_member(
+        &mut self,
+        identity: &str,
+        member: &str,
+        owner: Option<&str>,
+    ) -> Result<Value, RuntimeError> {
+        let name = model_binding_name(identity, member);
+        if self.stored_member_payload_is_dormant(identity, member, &name) {
+            return Err(RuntimeError::dormant_designation_member(
+                identity.to_string(),
+                member.to_string(),
+            ));
+        }
+        self.read_name(&name, owner)
+    }
+
+    /// Whether `name` is the binding of a stored model member whose identity is a
+    /// known nonresident dynamic identity. Only stored (`state`) members are
+    /// reported: a nontransactional derived member is reconstructed with the
+    /// identity and is not part of the dormant payload request.
+    fn stored_member_payload_is_dormant(&self, identity: &str, member: &str, name: &str) -> bool {
+        let Some(model_name) = self.dynamic_model_types.get(identity) else {
+            return false;
+        };
+        let Some(template) = self.runtime_model_templates.get(model_name) else {
+            return false;
+        };
+        let stored = template.members.iter().any(|candidate| {
+            candidate.name == member
+                && candidate.kind == crate::runtime_model_templates::RuntimeModelMemberKind::State
+        });
+        if !stored {
+            return false;
+        }
+        if self
+            .transaction
+            .as_ref()
+            .is_some_and(|transaction| transaction.terminated_model_identities.contains(identity))
+        {
+            return false;
+        }
+        !self.state_exists(name)
     }
 
     fn state_exists(&self, name: &str) -> bool {
