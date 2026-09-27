@@ -53,6 +53,10 @@
 - Added regression coverage for reactive reordering, stable ties, backing-order preservation,
   ordering-key validation, ordered-view structural-edit rejection, rollback, and plain-filter
   declaration separators.
+- Extended the existing structured dormant-designation-member request to modeled stored-member reads, so nested structural navigation composed inside one action no longer depends on whether the intermediate modeled identities are resident.
+- Dormant member payloads borrowed for such a read remain transaction-local: a read-only action leaves every identity dormant and publishes one candidate, a later failure rolls the whole route back, host observation outside an action still uses explicit designation materialization, and no source-language surface changed.
+
+
 
 ## v0.9.0 — identity-preserving application composition
 
