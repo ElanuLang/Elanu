@@ -131,15 +131,10 @@ fn start_browser_bridge(shared: SharedCabinetRuntime) -> io::Result<()> {
 }
 
 fn handle_browser_request(shared: &SharedCabinetRuntime, mut stream: TcpStream) -> io::Result<()> {
-    let mut request = [0u8; 4096];
-    let read = stream.read(&mut request)?;
+    let request = read_http_request(&mut stream)?;
 
-    if read == 0 {
-        return Ok(());
-    }
-
-    let request = String::from_utf8_lossy(&request[..read]);
-    let request_line = request.lines().next().unwrap_or_default();
+    let mut lines = request.split("\r\n");
+    let request_line = lines.next().unwrap_or_default();
 
     let mut parts = request_line.split_whitespace();
     let method = parts.next().unwrap_or_default();
@@ -150,20 +145,49 @@ fn handle_browser_request(shared: &SharedCabinetRuntime, mut stream: TcpStream) 
             let page = with_runtime(shared, browser_page);
 
             match page {
-                Ok(body) => {
-                    write_http_response(&mut stream, "200 OK", "text/html; charset=utf-8", &body)
-                }
+                Ok(body) => write_http_response(
+                    &mut stream,
+                    "200 OK",
+                    "text/html; charset=utf-8",
+                    &body,
+                    &[],
+                ),
                 Err(error) => write_http_response(
                     &mut stream,
                     "500 Internal Server Error",
                     "text/plain; charset=utf-8",
                     &format!("Cabinet observation failed: {error}"),
+                    &[],
+                ),
+            }
+        }
+
+        ("POST", "/action") => {
+            let body = request
+                .split_once("\r\n\r\n")
+                .map(|(_, body)| body)
+                .unwrap_or_default();
+
+            match invoke_browser_action(shared, body) {
+                Ok(()) => write_http_response(
+                    &mut stream,
+                    "303 See Other",
+                    "text/plain; charset=utf-8",
+                    "",
+                    &[("Location", "/")],
+                ),
+                Err(error) => write_http_response(
+                    &mut stream,
+                    "400 Bad Request",
+                    "text/plain; charset=utf-8",
+                    &error,
+                    &[],
                 ),
             }
         }
 
         ("GET", "/favicon.ico") => {
-            write_http_response(&mut stream, "204 No Content", "text/plain", "")
+            write_http_response(&mut stream, "204 No Content", "text/plain", "", &[])
         }
 
         ("GET", _) => write_http_response(
@@ -171,15 +195,97 @@ fn handle_browser_request(shared: &SharedCabinetRuntime, mut stream: TcpStream) 
             "404 Not Found",
             "text/plain; charset=utf-8",
             "Not found.",
+            &[],
         ),
 
         _ => write_http_response(
             &mut stream,
             "405 Method Not Allowed",
             "text/plain; charset=utf-8",
-            "Only GET is supported by this read-only Cabinet bridge.",
+            "Unsupported request.",
+            &[],
         ),
     }
+}
+
+fn read_http_request(stream: &mut TcpStream) -> io::Result<String> {
+    let mut bytes = Vec::new();
+    let mut buffer = [0u8; 4096];
+
+    loop {
+        let read = stream.read(&mut buffer)?;
+        if read == 0 {
+            break;
+        }
+
+        bytes.extend_from_slice(&buffer[..read]);
+
+        if let Some(header_end) = find_header_end(&bytes) {
+            let headers = String::from_utf8_lossy(&bytes[..header_end]);
+
+            let content_length = headers
+                .lines()
+                .find_map(|line| {
+                    let (name, value) = line.split_once(':')?;
+                    name.eq_ignore_ascii_case("content-length")
+                        .then(|| value.trim().parse::<usize>().ok())
+                        .flatten()
+                })
+                .unwrap_or(0);
+
+            let total = header_end + 4 + content_length;
+
+            if bytes.len() >= total {
+                break;
+            }
+        }
+    }
+
+    String::from_utf8(bytes)
+        .map_err(|error| io::Error::other(format!("invalid HTTP request: {error}")))
+}
+
+fn find_header_end(bytes: &[u8]) -> Option<usize> {
+    bytes.windows(4).position(|window| window == b"\r\n\r\n")
+}
+
+fn invoke_browser_action(shared: &SharedCabinetRuntime, body: &str) -> Result<(), String> {
+    let mut action = None;
+    let mut argument = None;
+
+    for field in body.split('&') {
+        let Some((name, value)) = field.split_once('=') else {
+            continue;
+        };
+
+        match name {
+            "action" => action = Some(value),
+            "argument" => argument = Some(value),
+            _ => {}
+        }
+    }
+
+    let action = action.ok_or_else(|| String::from("missing action"))?;
+
+    let argument = argument
+        .ok_or_else(|| String::from("missing argument"))?
+        .parse::<i64>()
+        .map_err(|_| String::from("invalid integer argument"))?;
+
+    // This bridge currently exposes only the two actions earned by this
+    // browser-selection pressure. It is not a general remote execution API.
+    match action {
+        "selectFolder" | "selectNote" => {}
+        _ => return Err(format!("unsupported action '{action}'")),
+    }
+
+    with_runtime(shared, |runtime| {
+        runtime
+            .run_action_with_values(action, &[Value::Int(argument)])
+            .map_err(|error| error.to_string())?;
+
+        materialize_visible(runtime).map_err(|error| error.to_string())
+    })
 }
 
 fn write_http_response(
@@ -187,6 +293,7 @@ fn write_http_response(
     status: &str,
     content_type: &str,
     body: &str,
+    extra_headers: &[(&str, &str)],
 ) -> io::Result<()> {
     let body = body.as_bytes();
 
@@ -196,11 +303,15 @@ fn write_http_response(
          Content-Type: {content_type}\r\n\
          Content-Length: {}\r\n\
          Cache-Control: no-store\r\n\
-         Connection: close\r\n\
-         \r\n",
+         Connection: close\r\n",
         body.len()
     )?;
 
+    for (name, value) in extra_headers {
+        write!(stream, "{name}: {value}\r\n")?;
+    }
+
+    write!(stream, "\r\n")?;
     stream.write_all(body)?;
     stream.flush()
 }
@@ -237,15 +348,35 @@ fn browser_page(runtime: &mut CabinetRuntime) -> AppResult<String> {
     } else {
         for (index, name) in folders.iter().enumerate() {
             contents.push_str(&format!(
-                "<li><span class=\"index\">f{index}</span> 📁 {}/</li>",
-                escape_html(name)
+                r#"
+        <li>
+            <form method="post" action="/action">
+                <input type="hidden" name="action" value="selectFolder">
+                <input type="hidden" name="argument" value="{index}">
+                <button type="submit">
+                    <span class="index">f{index}</span> 📁 {name}/
+                </button>
+            </form>
+        </li>
+        "#,
+                name = escape_html(name),
             ));
         }
 
         for (index, title) in notes.iter().enumerate() {
             contents.push_str(&format!(
-                "<li><span class=\"index\">n{index}</span> 📝 {}</li>",
-                escape_html(title)
+                r#"
+        <li>
+            <form method="post" action="/action">
+                <input type="hidden" name="action" value="selectNote">
+                <input type="hidden" name="argument" value="{index}">
+                <button type="submit">
+                    <span class="index">n{index}</span> 📝 {title}
+                </button>
+            </form>
+        </li>
+        "#,
+                title = escape_html(title),
             ));
         }
     }
@@ -364,7 +495,25 @@ fn browser_page(runtime: &mut CabinetRuntime) -> AppResult<String> {
             opacity: 0.65;
             font-size: 0.9rem;
         }}
-    </style>
+
+        form {{
+            margin: 0;
+    }}
+
+        button {{
+            font: inherit;
+            color: inherit;
+            background: none;
+            border: 0;
+            padding: 0.35rem 0;
+            cursor: pointer;
+            text-align: left;
+    }}
+
+        button:hover {{
+            text-decoration: underline;
+    }}
+</style>
 </head>
 <body>
     <header>
