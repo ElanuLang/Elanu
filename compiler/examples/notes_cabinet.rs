@@ -22,6 +22,7 @@ const SOURCE: &str = include_str!("../../examples/cabinet.elnu");
 const SNAPSHOT_MAGIC: &[u8; 8] = b"ELANCAB1";
 const SNAPSHOT_VERSION: u32 = 1;
 const BROWSER_ADDR: &str = "127.0.0.1:7878";
+const MAX_HTTP_REQUEST_BYTES: usize = 1024 * 1024;
 
 type CabinetRuntime = PartialPersistentRuntime<DirectoryProvider>;
 type SharedCabinetRuntime = Arc<Mutex<CabinetRuntime>>;
@@ -211,6 +212,7 @@ fn handle_browser_request(shared: &SharedCabinetRuntime, mut stream: TcpStream) 
 fn read_http_request(stream: &mut TcpStream) -> io::Result<String> {
     let mut bytes = Vec::new();
     let mut buffer = [0u8; 4096];
+    let mut expected_total = None;
 
     loop {
         let read = stream.read(&mut buffer)?;
@@ -220,29 +222,72 @@ fn read_http_request(stream: &mut TcpStream) -> io::Result<String> {
 
         bytes.extend_from_slice(&buffer[..read]);
 
-        if let Some(header_end) = find_header_end(&bytes) {
-            let headers = String::from_utf8_lossy(&bytes[..header_end]);
+        if bytes.len() > MAX_HTTP_REQUEST_BYTES {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "HTTP request exceeds Cabinet bridge limit",
+            ));
+        }
 
-            let content_length = headers
-                .lines()
-                .find_map(|line| {
-                    let (name, value) = line.split_once(':')?;
-                    name.eq_ignore_ascii_case("content-length")
-                        .then(|| value.trim().parse::<usize>().ok())
-                        .flatten()
-                })
-                .unwrap_or(0);
+        if expected_total.is_none() {
+            if let Some(header_end) = find_header_end(&bytes) {
+                let headers = String::from_utf8_lossy(&bytes[..header_end]);
+                let content_length = parse_content_length(&headers)?;
+                let total = header_end
+                    .checked_add(4)
+                    .and_then(|value| value.checked_add(content_length))
+                    .ok_or_else(|| {
+                        io::Error::new(io::ErrorKind::InvalidData, "HTTP request size overflow")
+                    })?;
 
-            let total = header_end + 4 + content_length;
+                if total > MAX_HTTP_REQUEST_BYTES {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "HTTP request exceeds Cabinet bridge limit",
+                    ));
+                }
 
+                expected_total = Some(total);
+            }
+        }
+
+        if let Some(total) = expected_total {
             if bytes.len() >= total {
+                bytes.truncate(total);
                 break;
             }
         }
     }
 
+    let header_end = find_header_end(&bytes).ok_or_else(|| {
+        io::Error::new(io::ErrorKind::UnexpectedEof, "incomplete HTTP request headers")
+    })?;
+    let total = expected_total.unwrap_or(header_end + 4);
+    if bytes.len() < total {
+        return Err(io::Error::new(
+            io::ErrorKind::UnexpectedEof,
+            "incomplete HTTP request body",
+        ));
+    }
+
     String::from_utf8(bytes)
         .map_err(|error| io::Error::other(format!("invalid HTTP request: {error}")))
+}
+
+fn parse_content_length(headers: &str) -> io::Result<usize> {
+    for line in headers.lines() {
+        let Some((name, value)) = line.split_once(':') else {
+            continue;
+        };
+
+        if name.eq_ignore_ascii_case("content-length") {
+            return value.trim().parse::<usize>().map_err(|_| {
+                io::Error::new(io::ErrorKind::InvalidData, "invalid Content-Length header")
+            });
+        }
+    }
+
+    Ok(0)
 }
 
 fn find_header_end(bytes: &[u8]) -> Option<usize> {
@@ -250,42 +295,119 @@ fn find_header_end(bytes: &[u8]) -> Option<usize> {
 }
 
 fn invoke_browser_action(shared: &SharedCabinetRuntime, body: &str) -> Result<(), String> {
-    let mut action = None;
-    let mut argument = None;
+    let fields = parse_form_urlencoded(body)?;
+    let action = fields
+        .get("action")
+        .ok_or_else(|| String::from("missing action"))?
+        .as_str();
+
+    match action {
+        "selectFolder" | "selectNote" => {
+            let argument = fields
+                .get("argument")
+                .ok_or_else(|| String::from("missing argument"))?
+                .parse::<i64>()
+                .map_err(|_| String::from("invalid integer argument"))?;
+
+            with_runtime(shared, |runtime| {
+                runtime
+                    .run_action_with_values(action, &[Value::Int(argument)])
+                    .map_err(|error| error.to_string())?;
+
+                materialize_visible(runtime).map_err(|error| error.to_string())
+            })
+        }
+        "selectHome" | "openTrash" => with_runtime(shared, |runtime| {
+            runtime.run_action(action).map_err(|error| error.to_string())?;
+            materialize_visible(runtime).map_err(|error| error.to_string())
+        }),
+        "editSelectedNote" => {
+            let title = fields
+                .get("title")
+                .ok_or_else(|| String::from("missing title"))?
+                .clone();
+            let body = fields
+                .get("body")
+                .ok_or_else(|| String::from("missing body"))?
+                .clone();
+
+            with_runtime(shared, |runtime| {
+                runtime
+                    .run_action_with_values(
+                        "editSelectedNote",
+                        &[Value::String(title), Value::String(body)],
+                    )
+                    .map_err(|error| error.to_string())?;
+
+                materialize_visible(runtime).map_err(|error| error.to_string())
+            })
+        }
+        _ => Err(format!("unsupported action '{action}'")),
+    }
+}
+
+fn parse_form_urlencoded(body: &str) -> Result<HashMap<String, String>, String> {
+    let mut fields = HashMap::new();
+
+    if body.is_empty() {
+        return Ok(fields);
+    }
 
     for field in body.split('&') {
-        let Some((name, value)) = field.split_once('=') else {
-            continue;
-        };
+        let (name, value) = field
+            .split_once('=')
+            .ok_or_else(|| String::from("malformed form field"))?;
+        let name = decode_form_component(name)?;
+        let value = decode_form_component(value)?;
 
-        match name {
-            "action" => action = Some(value),
-            "argument" => argument = Some(value),
-            _ => {}
+        if fields.insert(name.clone(), value).is_some() {
+            return Err(format!("duplicate form field '{name}'"));
         }
     }
 
-    let action = action.ok_or_else(|| String::from("missing action"))?;
+    Ok(fields)
+}
 
-    let argument = argument
-        .ok_or_else(|| String::from("missing argument"))?
-        .parse::<i64>()
-        .map_err(|_| String::from("invalid integer argument"))?;
+fn decode_form_component(value: &str) -> Result<String, String> {
+    let bytes = value.as_bytes();
+    let mut decoded = Vec::with_capacity(bytes.len());
+    let mut index = 0usize;
 
-    // This bridge currently exposes only the two actions earned by this
-    // browser-selection pressure. It is not a general remote execution API.
-    match action {
-        "selectFolder" | "selectNote" => {}
-        _ => return Err(format!("unsupported action '{action}'")),
+    while index < bytes.len() {
+        match bytes[index] {
+            b'+' => {
+                decoded.push(b' ');
+                index += 1;
+            }
+            b'%' => {
+                if index + 2 >= bytes.len() {
+                    return Err(String::from("incomplete percent escape in form data"));
+                }
+
+                let high = hex_digit(bytes[index + 1])
+                    .ok_or_else(|| String::from("invalid percent escape in form data"))?;
+                let low = hex_digit(bytes[index + 2])
+                    .ok_or_else(|| String::from("invalid percent escape in form data"))?;
+                decoded.push((high << 4) | low);
+                index += 3;
+            }
+            byte => {
+                decoded.push(byte);
+                index += 1;
+            }
+        }
     }
 
-    with_runtime(shared, |runtime| {
-        runtime
-            .run_action_with_values(action, &[Value::Int(argument)])
-            .map_err(|error| error.to_string())?;
+    String::from_utf8(decoded).map_err(|_| String::from("form data is not valid UTF-8"))
+}
 
-        materialize_visible(runtime).map_err(|error| error.to_string())
-    })
+fn hex_digit(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    }
 }
 
 fn write_http_response(
@@ -350,7 +472,7 @@ fn browser_page(runtime: &mut CabinetRuntime) -> AppResult<String> {
             contents.push_str(&format!(
                 r#"
         <li>
-            <form method="post" action="/action">
+            <form class="row-action" method="post" action="/action">
                 <input type="hidden" name="action" value="selectFolder">
                 <input type="hidden" name="argument" value="{index}">
                 <button type="submit">
@@ -367,7 +489,7 @@ fn browser_page(runtime: &mut CabinetRuntime) -> AppResult<String> {
             contents.push_str(&format!(
                 r#"
         <li>
-            <form method="post" action="/action">
+            <form class="row-action" method="post" action="/action">
                 <input type="hidden" name="action" value="selectNote">
                 <input type="hidden" name="argument" value="{index}">
                 <button type="submit">
@@ -391,9 +513,19 @@ fn browser_page(runtime: &mut CabinetRuntime) -> AppResult<String> {
         format!(
             r#"
             <section>
-                <h2>Selected note</h2>
-                <h3>{title} {trash_badge}</h3>
-                <pre>{body}</pre>
+                <h2>Selected note {trash_badge}</h2>
+                <form class="edit-note" method="post" action="/action">
+                    <input type="hidden" name="action" value="editSelectedNote">
+                    <label>
+                        Title
+                        <input type="text" name="title" value="{title}">
+                    </label>
+                    <label>
+                        Body
+                        <textarea name="body" rows="10">{body}</textarea>
+                    </label>
+                    <button type="submit">Save note</button>
+                </form>
             </section>
             "#,
             title = escape_html(&note_title),
@@ -457,6 +589,10 @@ fn browser_page(runtime: &mut CabinetRuntime) -> AppResult<String> {
             padding: 0.35rem 0;
         }}
 
+        form {{
+            margin: 0;
+        }}
+
         .index {{
             display: inline-block;
             min-width: 2.5rem;
@@ -476,16 +612,64 @@ fn browser_page(runtime: &mut CabinetRuntime) -> AppResult<String> {
             opacity: 0.65;
         }}
 
-        pre {{
-            white-space: pre-wrap;
-            font: inherit;
-            padding: 1rem;
-            border: 1px solid;
-            border-radius: 0.4rem;
+        .places {{
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
         }}
 
-        a {{
-            white-space: nowrap;
+        .row-action button,
+        .place-action button {{
+            font: inherit;
+            color: inherit;
+            background: none;
+            border: 0;
+            padding: 0.35rem 0;
+            cursor: pointer;
+            text-align: left;
+        }}
+
+        .row-action button:hover,
+        .place-action button:hover {{
+            text-decoration: underline;
+        }}
+
+        .edit-note {{
+            display: grid;
+            gap: 1rem;
+        }}
+
+        .edit-note label {{
+            display: grid;
+            gap: 0.35rem;
+            font-weight: 600;
+        }}
+
+        .edit-note input[type="text"],
+        .edit-note textarea {{
+            width: 100%;
+            box-sizing: border-box;
+            font: inherit;
+            color: inherit;
+            background: transparent;
+            border: 1px solid;
+            border-radius: 0.4rem;
+            padding: 0.65rem;
+        }}
+
+        .edit-note textarea {{
+            resize: vertical;
+        }}
+
+        .edit-note button {{
+            width: fit-content;
+            font: inherit;
+            color: inherit;
+            background: transparent;
+            border: 1px solid;
+            border-radius: 0.4rem;
+            padding: 0.5rem 0.8rem;
+            cursor: pointer;
         }}
 
         footer {{
@@ -496,35 +680,35 @@ fn browser_page(runtime: &mut CabinetRuntime) -> AppResult<String> {
             font-size: 0.9rem;
         }}
 
-        form {{
-            margin: 0;
-    }}
-
-        button {{
-            font: inherit;
-            color: inherit;
-            background: none;
-            border: 0;
-            padding: 0.35rem 0;
-            cursor: pointer;
-            text-align: left;
-    }}
-
-        button:hover {{
-            text-decoration: underline;
-    }}
-</style>
+        a {{
+            white-space: nowrap;
+        }}
+    </style>
 </head>
 <body>
     <header>
         <div>
             <h1>Elanu Notes Cabinet</h1>
-            <div>Read-only browser surface</div>
+            <div>Interactive browser surface</div>
         </div>
         <a href="/">Refresh</a>
     </header>
 
     <main>
+        <section>
+            <h2>Places</h2>
+            <div class="places">
+                <form class="place-action" method="post" action="/action">
+                    <input type="hidden" name="action" value="selectHome">
+                    <button type="submit">Home / Notes</button>
+                </form>
+                <form class="place-action" method="post" action="/action">
+                    <input type="hidden" name="action" value="openTrash">
+                    <button type="submit">Trash</button>
+                </form>
+            </div>
+        </section>
+
         <section>
             <h2>Selected folder</h2>
             <h3>{folder}</h3>
@@ -538,8 +722,8 @@ fn browser_page(runtime: &mut CabinetRuntime) -> AppResult<String> {
     </main>
 
     <footer>
-        One native Elanu runtime. This page observes the same committed Cabinet
-        state as the terminal surface.
+        One native Elanu runtime. This browser and the terminal surface observe
+        and mutate the same committed Cabinet state.
     </footer>
 </body>
 </html>
