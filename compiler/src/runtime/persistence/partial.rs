@@ -32,6 +32,12 @@ struct BackingHandle {
     resident_baseline: Option<Vec<u8>>,
 }
 
+#[derive(Debug, Clone)]
+struct ActionLocalBacking {
+    values: HashMap<String, Value>,
+    payload: Vec<u8>,
+}
+
 /// Production runtime wrapper for durable worlds whose dynamic modeled state
 /// may remain outside process memory until explicitly materialized.
 ///
@@ -437,6 +443,44 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
         self.run_action_with_arguments(name, &arguments)
     }
 
+    fn load_action_local_backing(
+        &mut self,
+        identity: &str,
+        requested_member: &str,
+    ) -> Result<ActionLocalBacking, RuntimeError> {
+        let handle = self.backed.get(identity).cloned().ok_or_else(|| {
+            RuntimeError::new(format!(
+                "dormant designation target '{identity}' has no partial-persistence backing"
+            ))
+        })?;
+
+        if !stored_members(&self.checked, &handle)?
+            .iter()
+            .any(|member| member.name == requested_member)
+        {
+            return Err(RuntimeError::new(format!(
+                "dormant designation target '{identity}' has no stored member '{requested_member}'"
+            )));
+        }
+
+        let key = encode_key(handle.token);
+        let payload = self
+            .provider
+            .load_backing(&key)?
+            .ok_or_else(|| RuntimeError::new("missing partial-persistence backing payload"))?;
+        let values = decode_backing(&self.checked, identity, &handle, &payload)?;
+
+        let cleanup_targets =
+            termination_cleanup_targets_from_values(&self.checked, &handle, &values)?;
+        if cleanup_targets != handle.termination_cleanup_targets {
+            return Err(RuntimeError::new(format!(
+                "partial-persistence termination-cleanup summary for '{identity}' does not match backing"
+            )));
+        }
+
+        Ok(ActionLocalBacking { values, payload })
+    }
+
     fn run_action_with_arguments(
         &mut self,
         name: &str,
@@ -454,20 +498,63 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
         let prior_backed = self.backed.clone();
         let prior_next_backing_token = self.next_backing_token;
 
-        self.runtime.transaction = Some(Transaction::default());
-        let result = self.runtime.invoke_action(name, arguments);
-        let transaction = match result {
-            Ok(()) => self
-                .runtime
-                .transaction
-                .take()
-                .expect("successful partial persistent action should retain its transaction"),
-            Err(error) => {
-                self.runtime.transaction = None;
-                self.runtime.next_dynamic_identity = prior_next_dynamic_identity;
-                return Err(error);
+        let mut action_local_backings = HashMap::<String, ActionLocalBacking>::new();
+
+        let mut transaction = loop {
+            self.runtime.transaction = Some(Transaction::default());
+
+            for (identity, action_local) in &action_local_backings {
+                let handle = prior_backed
+                    .get(identity)
+                    .expect("action-local identity should retain its backing");
+                borrow_backing_states_into_transaction(
+                    &self.checked,
+                    &mut self.runtime,
+                    identity,
+                    handle,
+                    &action_local.values,
+                )?;
+            }
+
+            match self.runtime.invoke_action(name, arguments) {
+                Ok(()) => {
+                    break self.runtime.transaction.take().expect(
+                        "successful partial persistent action should retain its transaction",
+                    );
+                }
+                Err(error) => {
+                    self.runtime.transaction = None;
+                    self.runtime.next_dynamic_identity = prior_next_dynamic_identity;
+
+                    let Some((identity, member)) = error
+                        .dormant_designation_member_request()
+                        .map(|(identity, member)| (identity.to_string(), member.to_string()))
+                    else {
+                        return Err(error);
+                    };
+
+                    if action_local_backings.contains_key(&identity) {
+                        return Err(error);
+                    }
+
+                    let backing = self.load_action_local_backing(&identity, &member)?;
+                    action_local_backings.insert(identity, backing);
+                }
             }
         };
+
+        for (identity, action_local) in &mut action_local_backings {
+            let handle = prior_backed
+                .get(identity)
+                .expect("action-local identity should retain its backing");
+
+            for member in stored_members(&self.checked, handle)? {
+                let name = model_binding_name(identity, &member.name);
+                if let Some(value) = transaction.writes.remove(&name) {
+                    action_local.values.insert(member.name.clone(), value);
+                }
+            }
+        }
 
         let terminated_model_identities = transaction.terminated_model_identities.clone();
         let candidate_next_dynamic_identity = self.runtime.next_dynamic_identity;
@@ -485,6 +572,32 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
         )?;
 
         let mut replacements = Vec::new();
+
+        for (identity, action_local) in &action_local_backings {
+            let handle = candidate_backed
+                .get(identity)
+                .cloned()
+                .expect("action-local identity should remain backed");
+
+            let payload =
+                encode_backing_values(&self.checked, identity, &handle, &action_local.values)?;
+            let cleanup_targets = termination_cleanup_targets_from_values(
+                &self.checked,
+                &handle,
+                &action_local.values,
+            )?;
+
+            if payload != action_local.payload {
+                upsert_backing_replacement(&mut replacements, encode_key(handle.token), payload);
+            }
+
+            let candidate_handle = candidate_backed
+                .get_mut(identity)
+                .expect("action-local identity should remain backed");
+            candidate_handle.termination_cleanup_targets = cleanup_targets;
+            candidate_handle.resident_baseline = None;
+        }
+
         if let Err(error) = self.rewrite_dormant_termination_cleanup(
             &candidate,
             &mut candidate_backed,
@@ -571,10 +684,12 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
                 .cloned()
                 .expect("affected dormant identity should remain backed");
             let key = encode_key(handle.token);
-            let payload = self
-                .provider
-                .load_backing(&key)?
-                .ok_or_else(|| RuntimeError::new("missing partial-persistence backing payload"))?;
+            let payload = match staged_backing_payload(replacements, &key) {
+                Some(payload) => payload.to_vec(),
+                None => self.provider.load_backing(&key)?.ok_or_else(|| {
+                    RuntimeError::new("missing partial-persistence backing payload")
+                })?,
+            };
             let mut values = decode_backing(&self.checked, &identity, &handle, &payload)?;
             let prior_targets =
                 termination_cleanup_targets_from_values(&self.checked, &handle, &values)?;
@@ -636,7 +751,7 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
                 )));
             }
             let replacement = encode_backing_values(&self.checked, &identity, &handle, &values)?;
-            replacements.push((key, replacement));
+            upsert_backing_replacement(replacements, key, replacement);
             candidate_backed
                 .get_mut(&identity)
                 .expect("affected dormant identity should remain backed")
@@ -656,6 +771,32 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
 
     pub fn into_provider(self) -> P {
         self.provider
+    }
+}
+
+fn staged_backing_payload<'a>(
+    replacements: &'a [(Vec<u8>, Vec<u8>)],
+    key: &[u8],
+) -> Option<&'a [u8]> {
+    replacements
+        .iter()
+        .rev()
+        .find(|(candidate, _)| candidate.as_slice() == key)
+        .map(|(_, payload)| payload.as_slice())
+}
+
+fn upsert_backing_replacement(
+    replacements: &mut Vec<(Vec<u8>, Vec<u8>)>,
+    key: Vec<u8>,
+    payload: Vec<u8>,
+) {
+    if let Some((_, existing)) = replacements
+        .iter_mut()
+        .find(|(candidate, _)| candidate == &key)
+    {
+        *existing = payload;
+    } else {
+        replacements.push((key, payload));
     }
 }
 
@@ -1101,6 +1242,55 @@ fn install_member_values(
     for (name, cell) in derived {
         runtime.derived.insert(name, cell);
     }
+    Ok(())
+}
+
+fn borrow_backing_states_into_transaction(
+    checked: &CheckedSource,
+    runtime: &mut Runtime,
+    identity: &str,
+    handle: &BackingHandle,
+    values: &HashMap<String, Value>,
+) -> Result<(), RuntimeError> {
+    let mut borrowed = Vec::new();
+
+    for member in stored_members(checked, handle)? {
+        let name = model_binding_name(identity, &member.name);
+        let value = values.get(&member.name).cloned().ok_or_else(|| {
+            RuntimeError::new(format!(
+                "backing payload is missing '{identity}.{}'",
+                member.name
+            ))
+        })?;
+
+        borrowed.push((
+            name,
+            StateCell {
+                value,
+                value_type: member.value_type.clone(),
+                designation: member.designation.clone(),
+                dependents: HashSet::new(),
+            },
+        ));
+    }
+
+    let transaction = runtime
+        .transaction
+        .as_mut()
+        .ok_or_else(|| RuntimeError::new("action-local backing requires an active transaction"))?;
+
+    for (name, state) in borrowed {
+        if transaction
+            .borrowed_states
+            .insert(name.clone(), state)
+            .is_some()
+        {
+            return Err(RuntimeError::new(format!(
+                "action-local backing duplicated borrowed state '{name}'"
+            )));
+        }
+    }
+
     Ok(())
 }
 

@@ -19,6 +19,7 @@ state workspace: Folder
 state sourceFolder: maybe live Folder = none
 state trashFolder: maybe live Folder = none
 state selectedFolder: maybe live Folder = none
+state doomedFolder: maybe live Folder = none
 state restoreDestination: maybe live Folder = none
 
 derived inSource = selectedFolder is in sourceFolder.folders
@@ -44,6 +45,12 @@ action seed {
     }
     selectedFolder = sourceFolder.folders[0]
     through selectedFolder.restoreParent = sourceFolder
+
+    create Folder in sourceFolder as doomed {
+        through doomed.name = "Doomed"
+        insert doomed into sourceFolder.folders
+    }
+    doomedFolder = sourceFolder.folders[1]
 }
 
 action moveToTrash {
@@ -56,6 +63,10 @@ action restoreFromTrash {
     restoreDestination = selectedFolder.restoreParent
     transfer selectedFolder from trashFolder to restoreDestination
     insert selectedFolder into restoreDestination.folders
+    if not selectedFolder is in restoreDestination.folders {
+        fail "restored membership was not transaction-visible"
+    }
+    destroy doomedFolder in sourceFolder
     remove selectedFolder from trashFolder.folders
     through selectedFolder.restoreParent = none
 }
@@ -124,41 +135,54 @@ fn remembered_parent_identity_feeds_partial_restore_without_reconstruction() {
     provider.replacements.clear();
     assert_eq!(
         provider.backing.len(),
-        3,
-        "seed should produce source, trash, and selected folder backings"
+        4,
+        "seed should produce source, trash, selected, and doomed folder backings"
     );
 
     let mut runtime = PartialPersistentRuntime::open(checked.clone(), provider)
         .expect("restart should leave all dynamic folders dormant");
-    assert_eq!(runtime.dormant_backing_keys().len(), 3);
+    assert_eq!(runtime.dormant_backing_keys().len(), 4);
 
-    runtime
-        .materialize_designation("sourceFolder")
-        .expect("host should materialize the remembered destination owner");
     runtime
         .materialize_designation("trashFolder")
         .expect("host should materialize the current provenance/membership owner");
     runtime
         .materialize_designation("selectedFolder")
         .expect("host should materialize the selected child");
-    assert_eq!(runtime.dormant_backing_keys().len(), 0);
+    runtime
+        .materialize_designation("doomedFolder")
+        .expect("host should materialize the child destroyed during restore");
+    assert_eq!(
+        runtime.dormant_backing_keys().len(),
+        1,
+        "remembered destination owner should remain dormant before restore"
+    );
 
     runtime
         .run_action("restoreFromTrash")
         .expect("remembered parent should feed transfer and structural restore directly");
+    assert_eq!(
+        runtime.dormant_backing_keys().len(),
+        1,
+        "restore should preserve destination dormancy"
+    );
 
     let mut provider = runtime.into_provider();
     assert_eq!(
         provider.loads.len(),
-        3,
-        "source restore should not perform any extra backing reads after explicit materialization"
+        4,
+        "restore should add exactly one backing read for the dormant destination"
     );
-    let source_key = provider.loads[0].clone();
-    let trash_key = provider.loads[1].clone();
-    let selected_key = provider.loads[2].clone();
+    let trash_key = provider.loads[0].clone();
+    let selected_key = provider.loads[1].clone();
+    let doomed_key = provider.loads[2].clone();
+    let source_key = provider.loads[3].clone();
     assert_ne!(source_key, trash_key);
     assert_ne!(source_key, selected_key);
+    assert_ne!(source_key, doomed_key);
     assert_ne!(trash_key, selected_key);
+    assert_ne!(trash_key, doomed_key);
+    assert_ne!(selected_key, doomed_key);
 
     assert_eq!(
         provider.replacements.len(),

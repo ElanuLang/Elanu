@@ -180,34 +180,24 @@ fn cabinet_source_drives_create_edit_trash_restore_and_rollback() {
         Value::Bool(true)
     );
 
+    runtime
+        .run_action("openTrash")
+        .expect("trash navigation should publish before restart");
+    assert_eq!(
+        value(&mut runtime, "selectedFolderName"),
+        Value::String("Trash".into())
+    );
+    assert_eq!(
+        value(&mut runtime, "selectedNotePresent"),
+        Value::Bool(false)
+    );
+
     let provider = runtime.into_provider();
     let mut restarted = PartialPersistentRuntime::open(checked.clone(), provider)
         .expect("cabinet should restart with dynamic state dormant");
     restarted
-        .materialize_designation("selectedFolder")
-        .expect("visible selected folder should explicitly materialize");
-    restarted
         .materialize_designation("trashFolder")
-        .expect("trash navigation should explicitly materialize");
-    restarted
-        .materialize_designation("selectedNote")
-        .expect("persisted selected note should explicitly materialize");
-    assert_eq!(
-        value(&mut restarted, "selectedNoteTitle"),
-        Value::String("Edited note".into())
-    );
-    assert_eq!(
-        value(&mut restarted, "selectedNoteBody"),
-        Value::String("Edited body".into())
-    );
-    assert_eq!(
-        value(&mut restarted, "selectedNoteInTrash"),
-        Value::Bool(true)
-    );
-
-    restarted
-        .run_action("openTrash")
-        .expect("trash navigation should publish");
+        .expect("visible Trash folder should explicitly materialize");
     assert_eq!(
         value(&mut restarted, "selectedFolderName"),
         Value::String("Trash".into())
@@ -243,6 +233,9 @@ fn cabinet_source_drives_create_edit_trash_restore_and_rollback() {
     restarted
         .run_action("restoreSelectedNote")
         .expect("restore should publish");
+    restarted
+        .materialize_designation("selectedFolder")
+        .expect("visible restored parent should explicitly materialize after restore");
     assert_eq!(
         value(&mut restarted, "selectedFolderName"),
         Value::String("Projects".into())
