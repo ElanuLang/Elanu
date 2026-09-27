@@ -146,7 +146,7 @@ fn absent_member_read_fails_and_rolls_back_prior_writes() {
         .run_action("absentReadAfterWrite")
         .expect_err("absent live read should fail");
     assert!(error.message.contains("no target"));
-    assert!(!error.message.contains("__meld_"));
+    assert!(!error.message.contains("__elanu_"));
     assert_eq!(runtime.value("marker").unwrap(), Value::Int(0));
 }
 
@@ -158,7 +158,7 @@ fn absent_through_mutation_fails_and_rolls_back_prior_writes() {
         .run_action("absentMutationAfterWrite")
         .expect_err("absent live mutation should fail");
     assert!(error.message.contains("no target"));
-    assert!(!error.message.contains("__meld_"));
+    assert!(!error.message.contains("__elanu_"));
     assert_eq!(runtime.value("marker").unwrap(), Value::Int(0));
 }
 
@@ -170,7 +170,7 @@ fn absent_designation_directed_remove_fails_and_rolls_back_prior_writes() {
         .run_action("absentRemovalAfterWrite")
         .expect_err("absent live structural removal should fail");
     assert!(error.message.contains("no target"));
-    assert!(!error.message.contains("__meld_"));
+    assert!(!error.message.contains("__elanu_"));
     assert_eq!(runtime.value("marker").unwrap(), Value::Int(0));
 }
 
@@ -213,7 +213,7 @@ state selectedTask: live Task = none
         .any(|diagnostic| diagnostic.message.contains("live Task")));
     assert!(!diagnostics
         .iter()
-        .any(|diagnostic| diagnostic.message.contains("__meld_")));
+        .any(|diagnostic| diagnostic.message.contains("__elanu_")));
 }
 
 #[test]
@@ -242,6 +242,6 @@ action callThroughAbsent {
         .run_action("callThroughAbsent")
         .expect_err("absent authority grant should fail before callee");
     assert!(error.message.contains("no target"));
-    assert!(!error.message.contains("__meld_"));
+    assert!(!error.message.contains("__elanu_"));
     assert_eq!(runtime.value("entered").unwrap(), Value::Bool(false));
 }

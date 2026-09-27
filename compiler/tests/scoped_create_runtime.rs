@@ -68,7 +68,7 @@ fn scoped_create_failure_rolls_back_body_writes_and_fresh_identity() {
     // This test intentionally probes the bootstrap representation to ensure the
     // failed transaction did not publish the freshly created child.
     assert!(runtime
-        .value("__meld_sm$__meld_dynamic$LineItem0$quantity")
+        .value("__elanu_sm$__elanu_dynamic$LineItem0$quantity")
         .is_err());
 }
 

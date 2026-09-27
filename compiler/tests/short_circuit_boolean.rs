@@ -52,7 +52,7 @@ action changePriceAfterReachable {
 
     runtime.run_action("setup").unwrap();
     assert_eq!(runtime.value("observed").unwrap(), Value::Int(0));
-    let filter = "__meld_filter_member$invoice$actionableLines";
+    let filter = "__elanu_filter_member$invoice$actionableLines";
     assert_eq!(runtime.derived_evaluations(filter), Some(1));
 
     runtime
@@ -114,7 +114,7 @@ action changePriceAfterReachable {
 
     runtime.run_action("setup").unwrap();
     assert_eq!(runtime.value("observed").unwrap(), Value::Int(1));
-    let filter = "__meld_filter_member$invoice$visibleLines";
+    let filter = "__elanu_filter_member$invoice$visibleLines";
     assert_eq!(runtime.derived_evaluations(filter), Some(1));
 
     runtime
@@ -240,7 +240,7 @@ action changePrice {
 
     runtime.run_action("setup").unwrap();
     assert_eq!(runtime.value("observed").unwrap(), Value::Int(0));
-    let filter = "__meld_filter_member$invoice$actionableLines";
+    let filter = "__elanu_filter_member$invoice$actionableLines";
     assert_eq!(runtime.derived_evaluations(filter), Some(1));
 
     assert!(runtime.run_action("reachRightThenFail").is_err());
@@ -269,6 +269,9 @@ fn boolean_operators_require_bool_operands_without_private_name_leakage() {
             .collect::<Vec<_>>()
             .join("\n");
         assert!(joined.contains("Bool"), "unexpected diagnostics: {joined}");
-        assert!(!joined.contains("__meld_"), "private name leaked: {joined}");
+        assert!(
+            !joined.contains("__elanu_"),
+            "private name leaked: {joined}"
+        );
     }
 }

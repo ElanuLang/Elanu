@@ -88,11 +88,11 @@ def test_writable_authority_is_not_an_ordinary_state_value():
     count = State("count", 0)
     target = writable(count)
 
-    with pytest.raises(WritableAuthorityError, match="not an ordinary Meld value"):
+    with pytest.raises(WritableAuthorityError, match="not an ordinary Elanu value"):
         State("holder", target)
 
     holder = State("holder", None)
-    with pytest.raises(WritableAuthorityError, match="not an ordinary Meld value"):
+    with pytest.raises(WritableAuthorityError, match="not an ordinary Elanu value"):
         with action():
             holder.set(target)
 
@@ -104,7 +104,7 @@ def test_writable_authority_cannot_become_a_derived_value():
     target = writable(count)
     leaked = Derived("leakedAuthority", lambda: target)
 
-    with pytest.raises(WritableAuthorityError, match="not an ordinary Meld value"):
+    with pytest.raises(WritableAuthorityError, match="not an ordinary Elanu value"):
         leaked.get()
 
     assert leaked.evaluations == 0

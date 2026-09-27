@@ -9,7 +9,7 @@ use crate::diagnostic::Diagnostic;
 use crate::program_facts::ProgramFacts;
 use crate::sequence_surface::{decode_sequence_literal, decode_sequence_live_type};
 
-pub(crate) const MODEL_SEQUENCE_BINDING_PREFIX: &str = "__meld_mseq$";
+pub(crate) const MODEL_SEQUENCE_BINDING_PREFIX: &str = "__elanu_mseq$";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExternalizedModelSequence {

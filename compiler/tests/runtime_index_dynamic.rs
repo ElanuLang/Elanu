@@ -123,7 +123,7 @@ action selectMissingThenRead {
 "#;
 
 fn line_targets(runtime: &mut Runtime) -> Vec<String> {
-    let Value::Sequence { targets, .. } = runtime.value("__meld_mseq$invoice$lines").unwrap()
+    let Value::Sequence { targets, .. } = runtime.value("__elanu_mseq$invoice$lines").unwrap()
     else {
         panic!("invoice.lines should be runtime-sized sequence state");
     };

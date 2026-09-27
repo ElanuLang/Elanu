@@ -223,5 +223,5 @@ action bad {
         .collect::<Vec<_>>()
         .join("\n");
     assert!(rendered.contains("moving live designation 'moving' has type live Other"));
-    assert!(!rendered.contains("__meld"));
+    assert!(!rendered.contains("__elanu"));
 }

@@ -257,7 +257,7 @@ Do not rely on a successful workflow run from an earlier commit after the PR hea
 
 Use precise compiler terminology in code and documentation.
 
-Generated `__meld_*`, `__elanu_*`, carrier names, private runtime nodes, and similar encodings are compiler representation. They should not appear in user-facing semantics except when a test or implementation discussion is specifically about lowering or leakage.
+Generated `__elanu_*`, `__elanu_*`, carrier names, private runtime nodes, and similar encodings are compiler representation. They should not appear in user-facing semantics except when a test or implementation discussion is specifically about lowering or leakage.
 
 Prefer preserving semantic facts structurally rather than reconstructing them later from naming conventions.
 

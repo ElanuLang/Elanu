@@ -11,9 +11,9 @@ use crate::reduction_surface::decode_reduction;
 use crate::semantic::{binary_result_type, common_type, show_type, types_compatible, ValueType};
 use crate::sequence_surface::{decode_sequence_index_segment, decode_sequence_live_type};
 
-pub(crate) const MODEL_FILTER_BINDING_PREFIX: &str = "__meld_filter_member$";
-const MODEL_SEQUENCE_BINDING_PREFIX: &str = "__meld_mseq$";
-const MODEL_BINDING_PREFIX: &str = "__meld_sm$";
+pub(crate) const MODEL_FILTER_BINDING_PREFIX: &str = "__elanu_filter_member$";
+const MODEL_SEQUENCE_BINDING_PREFIX: &str = "__elanu_mseq$";
+const MODEL_BINDING_PREFIX: &str = "__elanu_sm$";
 
 #[derive(Debug, Clone)]
 struct FilterMemberSpec {

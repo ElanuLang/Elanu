@@ -195,7 +195,7 @@ action setup {
         .expect("runtime reduction binding should remain in the lowered program");
     assert!(!matches!(
         reduction_expression,
-        Expr::String(value) if value.starts_with("__meld_runtime_reduce$")
+        Expr::String(value) if value.starts_with("__elanu_runtime_reduce$")
     ));
 
     for declaration in &mut program.program.declarations {

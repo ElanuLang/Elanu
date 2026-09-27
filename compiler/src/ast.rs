@@ -5,11 +5,11 @@ use crate::sequence_surface::{
     decode_sequence_index_segment, decode_sequence_literal, decode_sequence_live_type,
 };
 
-pub const LIVE_TYPE_PREFIX: &str = "__meld_surface_live_type$";
-pub const MAYBE_LIVE_TYPE_PREFIX: &str = "__meld_surface_maybe_live_type$";
-pub const LIVE_DERIVED_PREFIX: &str = "__meld_surface_live_derived$";
-pub const LIVE_CAPTURE_PREFIX: &str = "__meld_surface_live_capture$";
-pub const THROUGH_PREFIX: &str = "__meld_surface_through$";
+pub const LIVE_TYPE_PREFIX: &str = "__elanu_surface_live_type$";
+pub const MAYBE_LIVE_TYPE_PREFIX: &str = "__elanu_surface_maybe_live_type$";
+pub const LIVE_DERIVED_PREFIX: &str = "__elanu_surface_live_derived$";
+pub const LIVE_CAPTURE_PREFIX: &str = "__elanu_surface_live_capture$";
+pub const THROUGH_PREFIX: &str = "__elanu_surface_through$";
 
 pub fn encode_live_type_name(model: &str) -> String {
     format!("{LIVE_TYPE_PREFIX}{model}")

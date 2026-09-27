@@ -32,5 +32,5 @@ action bad {
         .join("\n");
 
     assert!(messages.contains("left operand of 'is in' must be a persistent live designation"));
-    assert!(!messages.contains("__meld_"));
+    assert!(!messages.contains("__elanu_"));
 }

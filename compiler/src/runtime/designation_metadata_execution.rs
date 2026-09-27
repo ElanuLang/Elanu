@@ -22,14 +22,14 @@ state optional: maybe live Task = none
 
     let required = runtime
         .runtime_designations
-        .get("__meld_live$required")
+        .get("__elanu_live$required")
         .expect("plain live designation metadata should survive lowering");
     assert_eq!(required.model_name, "Task");
     assert!(!required.allows_none);
 
     let optional = runtime
         .runtime_designations
-        .get("__meld_live$optional")
+        .get("__elanu_live$optional")
         .expect("maybe-live designation metadata should survive lowering");
     assert_eq!(optional.model_name, "Task");
     assert!(optional.allows_none);

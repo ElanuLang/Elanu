@@ -104,11 +104,11 @@ fn grant_resolves_exact_child_before_filter_membership_changes() {
         .expect("filtered state-through grant should commit");
 
     assert_eq!(
-        runtime.value("__meld_sm$itemA$quantity").unwrap(),
+        runtime.value("__elanu_sm$itemA$quantity").unwrap(),
         Value::Int(0)
     );
     assert_eq!(
-        runtime.value("__meld_sm$itemB$quantity").unwrap(),
+        runtime.value("__elanu_sm$itemB$quantity").unwrap(),
         Value::Int(3)
     );
     assert_eq!(runtime.value("observed").unwrap(), Value::Int(3));
@@ -124,7 +124,7 @@ fn staged_predicate_changes_are_visible_before_grant_resolution() {
 
     assert_eq!(runtime.value("selected").unwrap(), Value::Int(2));
     assert_eq!(
-        runtime.value("__meld_sm$itemC$quantity").unwrap(),
+        runtime.value("__elanu_sm$itemC$quantity").unwrap(),
         Value::Int(7)
     );
     assert_eq!(runtime.value("observed").unwrap(), Value::Int(7));
@@ -139,7 +139,7 @@ fn staged_membership_is_visible_before_grant_resolution() {
         .expect("staged membership should affect grant-time view");
 
     assert_eq!(
-        runtime.value("__meld_sm$itemC$quantity").unwrap(),
+        runtime.value("__elanu_sm$itemC$quantity").unwrap(),
         Value::Int(8)
     );
     assert_eq!(runtime.value("observed").unwrap(), Value::Int(8));
@@ -154,7 +154,7 @@ fn duplicate_positions_grant_the_same_underlying_child_state() {
         .expect("duplicate position should grant exact child state");
 
     assert_eq!(
-        runtime.value("__meld_sm$itemA$quantity").unwrap(),
+        runtime.value("__elanu_sm$itemA$quantity").unwrap(),
         Value::Int(0)
     );
     assert_eq!(runtime.value("observed").unwrap(), Value::Int(3));
@@ -169,7 +169,7 @@ fn filtered_grant_can_be_forwarded_without_rebinding_to_view_position() {
         .expect("filtered grant should forward exact state authority");
 
     assert_eq!(
-        runtime.value("__meld_sm$itemA$quantity").unwrap(),
+        runtime.value("__elanu_sm$itemA$quantity").unwrap(),
         Value::Int(6)
     );
     assert_eq!(runtime.value("observed").unwrap(), Value::Int(6));
@@ -186,7 +186,7 @@ fn invalid_filtered_grant_indices_fail_and_roll_back_prior_writes() {
     assert!(missing.message.contains("out of bounds"));
     assert_eq!(runtime.value("selected").unwrap(), Value::Int(0));
     assert_eq!(
-        runtime.value("__meld_sm$itemA$note").unwrap(),
+        runtime.value("__elanu_sm$itemA$note").unwrap(),
         Value::Int(0)
     );
 
@@ -196,7 +196,7 @@ fn invalid_filtered_grant_indices_fail_and_roll_back_prior_writes() {
     assert!(negative.message.contains("cannot be negative"));
     assert_eq!(runtime.value("selected").unwrap(), Value::Int(0));
     assert_eq!(
-        runtime.value("__meld_sm$itemA$note").unwrap(),
+        runtime.value("__elanu_sm$itemA$note").unwrap(),
         Value::Int(0)
     );
 }
@@ -208,11 +208,11 @@ fn later_failure_rolls_back_filtered_grant_mutation() {
     assert!(runtime.run_action("grantThenFail").is_err());
 
     assert_eq!(
-        runtime.value("__meld_sm$itemA$quantity").unwrap(),
+        runtime.value("__elanu_sm$itemA$quantity").unwrap(),
         Value::Int(2)
     );
     assert_eq!(
-        runtime.value("__meld_sm$itemA$note").unwrap(),
+        runtime.value("__elanu_sm$itemA$note").unwrap(),
         Value::Int(0)
     );
 }
@@ -247,5 +247,5 @@ action invalid {
         .contains("cannot grant derived member 'doubled' as writable state")));
     assert!(errors
         .iter()
-        .all(|error| !error.message.contains("__meld_")));
+        .all(|error| !error.message.contains("__elanu_")));
 }

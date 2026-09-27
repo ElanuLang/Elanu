@@ -92,11 +92,11 @@ fn mutation_resolves_exact_child_before_filter_membership_changes() {
         .expect("filtered mutation should commit");
 
     assert_eq!(
-        runtime.value("__meld_sm$itemA$quantity").unwrap(),
+        runtime.value("__elanu_sm$itemA$quantity").unwrap(),
         Value::Int(0)
     );
     assert_eq!(
-        runtime.value("__meld_sm$itemB$quantity").unwrap(),
+        runtime.value("__elanu_sm$itemB$quantity").unwrap(),
         Value::Int(3)
     );
     assert_eq!(runtime.value("observed").unwrap(), Value::Int(3));
@@ -113,7 +113,7 @@ fn staged_predicate_changes_are_visible_before_mutation_target_resolution() {
 
     assert_eq!(runtime.value("selected").unwrap(), Value::Int(2));
     assert_eq!(
-        runtime.value("__meld_sm$itemC$quantity").unwrap(),
+        runtime.value("__elanu_sm$itemC$quantity").unwrap(),
         Value::Int(7)
     );
     assert_eq!(runtime.value("observed").unwrap(), Value::Int(7));
@@ -129,7 +129,7 @@ fn staged_membership_is_visible_before_mutation_target_resolution() {
         .expect("staged membership should affect current filtered view");
 
     assert_eq!(
-        runtime.value("__meld_sm$itemC$quantity").unwrap(),
+        runtime.value("__elanu_sm$itemC$quantity").unwrap(),
         Value::Int(7)
     );
     assert_eq!(runtime.value("observed").unwrap(), Value::Int(7));
@@ -145,7 +145,7 @@ fn duplicate_occurrence_selection_does_not_create_occurrence_identity() {
         .expect("duplicate occurrence should resolve the designated child");
 
     assert_eq!(
-        runtime.value("__meld_sm$itemA$quantity").unwrap(),
+        runtime.value("__elanu_sm$itemA$quantity").unwrap(),
         Value::Int(0)
     );
     assert_eq!(runtime.value("observed").unwrap(), Value::Int(3));
@@ -162,7 +162,7 @@ fn invalid_filtered_mutation_indices_fail_and_roll_back_prior_writes() {
     assert!(missing.message.contains("out of bounds"));
     assert_eq!(runtime.value("selected").unwrap(), Value::Int(0));
     assert_eq!(
-        runtime.value("__meld_sm$itemA$note").unwrap(),
+        runtime.value("__elanu_sm$itemA$note").unwrap(),
         Value::Int(0)
     );
 
@@ -172,7 +172,7 @@ fn invalid_filtered_mutation_indices_fail_and_roll_back_prior_writes() {
     assert!(negative.message.contains("cannot be negative"));
     assert_eq!(runtime.value("selected").unwrap(), Value::Int(0));
     assert_eq!(
-        runtime.value("__meld_sm$itemA$note").unwrap(),
+        runtime.value("__elanu_sm$itemA$note").unwrap(),
         Value::Int(0)
     );
 }
@@ -184,11 +184,11 @@ fn later_failure_rolls_back_filtered_target_mutation() {
 
     assert!(runtime.run_action("mutateThenFail").is_err());
     assert_eq!(
-        runtime.value("__meld_sm$itemA$quantity").unwrap(),
+        runtime.value("__elanu_sm$itemA$quantity").unwrap(),
         Value::Int(2)
     );
     assert_eq!(
-        runtime.value("__meld_sm$itemA$note").unwrap(),
+        runtime.value("__elanu_sm$itemA$note").unwrap(),
         Value::Int(0)
     );
 }
@@ -219,7 +219,7 @@ action invalid {
         .contains("cannot mutate derived member 'doubled'")));
     assert!(errors
         .iter()
-        .all(|error| !error.message.contains("__meld_")));
+        .all(|error| !error.message.contains("__elanu_")));
 }
 
 #[test]

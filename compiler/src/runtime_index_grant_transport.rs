@@ -12,7 +12,7 @@ use crate::runtime_sequence_markers::encode_runtime_sequence_type;
 use crate::semantic::ValueType;
 use crate::sequence_surface::{decode_sequence_index_segment, decode_sequence_live_type};
 
-pub(crate) const RUNTIME_INDEX_GRANT_CARRIER_PREFIX: &str = "__meld_runtime_index_grant$";
+pub(crate) const RUNTIME_INDEX_GRANT_CARRIER_PREFIX: &str = "__elanu_runtime_index_grant$";
 
 #[derive(Debug, Clone)]
 struct CarrierSpec {

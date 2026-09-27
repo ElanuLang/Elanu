@@ -275,7 +275,7 @@ action bad {
         .collect::<Vec<_>>()
         .join("\n");
     assert!(messages.contains("immutable"));
-    assert!(!messages.contains("__meld_"));
+    assert!(!messages.contains("__elanu_"));
 
     let escaped = r#"
 state model Task { state title = "" }
@@ -298,7 +298,7 @@ action bad {
         .collect::<Vec<_>>()
         .join("\n");
     assert!(messages.contains("captured"));
-    assert!(!messages.contains("__meld_"));
+    assert!(!messages.contains("__elanu_"));
 }
 
 #[test]
@@ -327,5 +327,5 @@ action bad {
 
     assert!(messages.contains("live Task"));
     assert!(messages.contains("live Other"));
-    assert!(!messages.contains("__meld_"));
+    assert!(!messages.contains("__elanu_"));
 }

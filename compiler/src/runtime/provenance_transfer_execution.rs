@@ -65,7 +65,7 @@ fn transfer_changes_only_root_provenance_and_preserves_identity_and_membership()
     let mut runtime = runtime(SOURCE);
     runtime.run_action("seed").expect("seed should commit");
 
-    let identity = targets(&mut runtime, "__meld_mseq$left$documents")[0].clone();
+    let identity = targets(&mut runtime, "__elanu_mseq$left$documents")[0].clone();
     assert_eq!(
         runtime.current_dynamic_model_owner(&identity).as_deref(),
         Some("left")
@@ -78,15 +78,15 @@ fn transfer_changes_only_root_provenance_and_preserves_identity_and_membership()
             Some("right")
         );
         assert_eq!(
-            runtime.value("__meld_live$selected")?,
+            runtime.value("__elanu_live$selected")?,
             Value::String(identity.clone())
         );
         assert_eq!(
-            targets(runtime, "__meld_mseq$left$documents"),
+            targets(runtime, "__elanu_mseq$left$documents"),
             vec![identity.clone()]
         );
         assert_eq!(
-            targets(runtime, "__meld_mseq$right$documents"),
+            targets(runtime, "__elanu_mseq$right$documents"),
             vec![identity.clone()]
         );
         Ok(())
@@ -98,15 +98,15 @@ fn transfer_changes_only_root_provenance_and_preserves_identity_and_membership()
         Some(&"right".to_string())
     );
     assert_eq!(
-        runtime.value("__meld_live$selected").unwrap(),
+        runtime.value("__elanu_live$selected").unwrap(),
         Value::String(identity.clone())
     );
     assert_eq!(
-        targets(&mut runtime, "__meld_mseq$left$documents"),
+        targets(&mut runtime, "__elanu_mseq$left$documents"),
         vec![identity.clone()]
     );
     assert_eq!(
-        targets(&mut runtime, "__meld_mseq$right$documents"),
+        targets(&mut runtime, "__elanu_mseq$right$documents"),
         vec![identity]
     );
 }
@@ -115,7 +115,7 @@ fn transfer_changes_only_root_provenance_and_preserves_identity_and_membership()
 fn aborted_transfer_restores_committed_provenance() {
     let mut runtime = runtime(SOURCE);
     runtime.run_action("seed").expect("seed should commit");
-    let identity = targets(&mut runtime, "__meld_mseq$left$documents")[0].clone();
+    let identity = targets(&mut runtime, "__elanu_mseq$left$documents")[0].clone();
 
     runtime.transaction = Some(Transaction::default());
     runtime
@@ -137,7 +137,7 @@ fn aborted_transfer_restores_committed_provenance() {
 fn staged_transfer_changes_rooting_proof_for_later_lifetime_work() {
     let mut runtime = runtime(SOURCE);
     runtime.run_action("seed").expect("seed should commit");
-    let identity = targets(&mut runtime, "__meld_mseq$left$documents")[0].clone();
+    let identity = targets(&mut runtime, "__elanu_mseq$left$documents")[0].clone();
 
     runtime.transaction = Some(Transaction::default());
     runtime
@@ -168,7 +168,7 @@ fn staged_transfer_changes_rooting_proof_for_later_lifetime_work() {
 fn transfer_requires_the_exact_current_source_owner() {
     let mut runtime = runtime(SOURCE);
     runtime.run_action("seed").expect("seed should commit");
-    let identity = targets(&mut runtime, "__meld_mseq$left$documents")[0].clone();
+    let identity = targets(&mut runtime, "__elanu_mseq$left$documents")[0].clone();
 
     let error = run_test_transaction(&mut runtime, |runtime| {
         runtime.transfer_runtime_model_owner(&identity, "right", "left")
@@ -186,7 +186,7 @@ fn transfer_requires_the_exact_current_source_owner() {
 fn transfer_rejects_self_rooting_and_unknown_destination() {
     let mut runtime = runtime(SOURCE);
     runtime.run_action("seed").expect("seed should commit");
-    let identity = targets(&mut runtime, "__meld_mseq$left$documents")[0].clone();
+    let identity = targets(&mut runtime, "__elanu_mseq$left$documents")[0].clone();
 
     let self_error = run_test_transaction(&mut runtime, |runtime| {
         runtime.transfer_runtime_model_owner(&identity, "left", &identity)
@@ -209,7 +209,7 @@ fn transfer_rejects_self_rooting_and_unknown_destination() {
 fn same_owner_transfer_is_a_valid_no_op_after_provenance_validation() {
     let mut runtime = runtime(SOURCE);
     runtime.run_action("seed").expect("seed should commit");
-    let identity = targets(&mut runtime, "__meld_mseq$left$documents")[0].clone();
+    let identity = targets(&mut runtime, "__elanu_mseq$left$documents")[0].clone();
 
     run_test_transaction(&mut runtime, |runtime| {
         runtime.transfer_runtime_model_owner(&identity, "left", "left")
@@ -226,7 +226,7 @@ fn same_owner_transfer_is_a_valid_no_op_after_provenance_validation() {
 fn nonleaf_transfer_changes_only_parent_edge_and_preserves_descendant_provenance() {
     let mut runtime = runtime(SOURCE);
     runtime.run_action("seed").expect("seed should commit");
-    let identity = targets(&mut runtime, "__meld_mseq$left$documents")[0].clone();
+    let identity = targets(&mut runtime, "__elanu_mseq$left$documents")[0].clone();
 
     runtime.transaction = Some(Transaction::default());
     let descendant = runtime
@@ -266,7 +266,7 @@ fn nonleaf_transfer_changes_only_parent_edge_and_preserves_descendant_provenance
 fn nonleaf_transfer_rollback_restores_parent_edge_without_touching_descendant_edge() {
     let mut runtime = runtime(SOURCE);
     runtime.run_action("seed").expect("seed should commit");
-    let identity = targets(&mut runtime, "__meld_mseq$left$documents")[0].clone();
+    let identity = targets(&mut runtime, "__elanu_mseq$left$documents")[0].clone();
 
     runtime.transaction = Some(Transaction::default());
     let descendant = runtime
@@ -306,7 +306,7 @@ fn nonleaf_transfer_rollback_restores_parent_edge_without_touching_descendant_ed
 fn nonleaf_transfer_rejects_destination_descendant_cycle() {
     let mut runtime = runtime(SOURCE);
     runtime.run_action("seed").expect("seed should commit");
-    let identity = targets(&mut runtime, "__meld_mseq$left$documents")[0].clone();
+    let identity = targets(&mut runtime, "__elanu_mseq$left$documents")[0].clone();
 
     runtime.transaction = Some(Transaction::default());
     let descendant = runtime
@@ -338,7 +338,7 @@ fn nonleaf_transfer_rejects_destination_descendant_cycle() {
 fn nonleaf_transfer_cycle_check_observes_staged_owner_changes() {
     let mut runtime = runtime(SOURCE);
     runtime.run_action("seed").expect("seed should commit");
-    let identity = targets(&mut runtime, "__meld_mseq$left$documents")[0].clone();
+    let identity = targets(&mut runtime, "__elanu_mseq$left$documents")[0].clone();
 
     runtime.transaction = Some(Transaction::default());
     let candidate_destination = runtime

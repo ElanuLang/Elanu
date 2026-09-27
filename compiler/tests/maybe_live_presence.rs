@@ -196,5 +196,5 @@ derived invalid = count is present
     assert!(!diagnostics.is_empty());
     assert!(!diagnostics
         .iter()
-        .any(|diagnostic| diagnostic.message.contains("__meld_")));
+        .any(|diagnostic| diagnostic.message.contains("__elanu_")));
 }

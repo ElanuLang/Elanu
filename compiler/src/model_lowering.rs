@@ -1265,11 +1265,11 @@ fn split_member_path<'a>(
 }
 
 pub(crate) fn model_binding_name(root: &str, member: &str) -> String {
-    format!("__meld_sm${root}${member}")
+    format!("__elanu_sm${root}${member}")
 }
 
 fn model_parameter_member_name(parameter: &str, member: &str) -> String {
-    format!("__meld_smp${parameter}${member}")
+    format!("__elanu_smp${parameter}${member}")
 }
 
 fn diag(location: SourceLocation, message: impl Into<String>) -> Diagnostic {
