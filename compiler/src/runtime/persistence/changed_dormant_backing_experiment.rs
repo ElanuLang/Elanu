@@ -24,22 +24,22 @@ derived coldDocumentTitle = coldFolder.documents[0].title
 derived coldInWorkspace = coldFolder is in workspace.folders
 
 action seed {
-    create Folder in workspace as active {
+    create Folder under workspace as active {
         through active.name = "Active"
         insert active into workspace.folders
     }
     activeFolder = workspace.folders[0]
-    create Document in activeFolder as activeDocument {
+    create Document under activeFolder as activeDocument {
         through activeDocument.title = "Active document"
         insert activeDocument into activeFolder.documents
     }
 
-    create Folder in workspace as cold {
+    create Folder under workspace as cold {
         through cold.name = "Cold"
         insert cold into workspace.folders
     }
     coldFolder = workspace.folders[1]
-    create Document in coldFolder as coldDocument {
+    create Document under coldFolder as coldDocument {
         through coldDocument.title = "Cold document"
         insert coldDocument into coldFolder.documents
     }

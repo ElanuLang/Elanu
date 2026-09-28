@@ -19,7 +19,7 @@ state selectedLine = 0
 state observed = 0
 
 action setup {
-    create LineItem in invoice as line {
+    create LineItem under invoice as line {
         insert line into invoice.lines
     }
 }

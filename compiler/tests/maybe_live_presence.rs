@@ -33,7 +33,7 @@ action observePresence {
 }
 
 action addAndSelect {
-    create Task in workstation as task {
+    create Task under workstation as task {
         through task.title = "Alpha"
         insert task into workstation.tasks
     }

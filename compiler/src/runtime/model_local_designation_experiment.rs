@@ -48,13 +48,13 @@ state holderB: maybe live Folder = none
 state target: maybe live Folder = none
 
 action seed {
-    create Folder in workspace as a {
+    create Folder under workspace as a {
         insert a into workspace.children
     }
-    create Folder in workspace as b {
+    create Folder under workspace as b {
         insert b into workspace.children
     }
-    create Folder in workspace as t {
+    create Folder under workspace as t {
         insert t into workspace.children
     }
 

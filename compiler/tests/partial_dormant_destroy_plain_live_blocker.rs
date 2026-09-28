@@ -20,7 +20,7 @@ state pinned: live Node = live fallback
 state observedName = ""
 
 action seed {
-    create Node in left as childNode {
+    create Node under left as childNode {
         through childNode.name = "Dormant leaf"
         selected = childNode
         pinned = childNode
@@ -28,11 +28,11 @@ action seed {
 }
 
 action destroySelected {
-    destroy selected in left
+    destroy selected under left
 }
 
 action proveLeftOwnsSelected {
-    transfer selected from left to left
+    reroot selected from left to left
 }
 
 action readPinnedName {

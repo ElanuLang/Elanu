@@ -25,7 +25,7 @@ derived selectedTitle = selectedNote.title
 derived selectedBody = selectedNote.body
 
 action seed {
-    create Note in cabinet as note {
+    create Note under cabinet as note {
         through note.title = "Initial"
         through note.body = "Initial body"
         insert note into cabinet.notes

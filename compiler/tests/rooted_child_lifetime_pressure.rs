@@ -27,7 +27,7 @@ state recentStillInDocuments = false
 state recentStillInTrash = false
 
 action seed {
-    create Document in workspace as document {
+    create Document under workspace as document {
         through document.title = "Draft"
         insert document into workspace.documents
     }

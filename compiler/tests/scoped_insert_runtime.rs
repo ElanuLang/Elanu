@@ -26,7 +26,7 @@ state invoice: Invoice
 state observed = 0.0
 
 action addLine {
-    create LineItem in invoice as line {
+    create LineItem under invoice as line {
         through line.quantity = 3
         insert line into invoice.lines
         observed = invoice.total
@@ -34,11 +34,11 @@ action addLine {
 }
 
 action addTwo {
-    create LineItem in invoice as first {
+    create LineItem under invoice as first {
         through first.quantity = 2
         insert first into invoice.lines
     }
-    create LineItem in invoice as second {
+    create LineItem under invoice as second {
         through second.quantity = 4
         insert second into invoice.lines
     }
@@ -46,7 +46,7 @@ action addTwo {
 }
 
 action addThenFail {
-    create LineItem in invoice as line {
+    create LineItem under invoice as line {
         through line.quantity = 9
         insert line into invoice.lines
         observed = invoice.total
@@ -130,7 +130,7 @@ state other: Invoice
 state selected: maybe live LineItem = none
 
 action seed {
-    create LineItem in invoice as line {
+    create LineItem under invoice as line {
         insert line into other.lines
     }
     selected = other.lines[0]
@@ -183,7 +183,7 @@ state model Invoice {
 state invoice: Invoice
 
 action add {
-    create LineItem in invoice as line {
+    create LineItem under invoice as line {
         insert line into invoice.lines
     }
 }
@@ -228,7 +228,7 @@ state board: Board
 state selected: maybe live Task = none
 
 action seed {
-    create Task in board as task {
+    create Task under board as task {
         insert task into board.backlog
     }
     selected = board.backlog[0]
@@ -279,7 +279,7 @@ state right: Board
 state selected: maybe live Task = none
 
 action seed {
-    create Task in left as task {
+    create Task under left as task {
         insert task into left.tasks
     }
     selected = left.tasks[0]

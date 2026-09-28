@@ -25,12 +25,12 @@ state selectedLine = 0
 state observed = 0
 
 action setup {
-    create LineItem in invoice as first {
+    create LineItem under invoice as first {
         through first.quantity = 2
         insert first into invoice.lines
         insert first into invoice.lines
     }
-    create LineItem in invoice as second {
+    create LineItem under invoice as second {
         through second.quantity = 5
         insert second into invoice.lines
     }

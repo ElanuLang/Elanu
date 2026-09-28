@@ -25,19 +25,19 @@ state selectedGrandchild: maybe live Folder = none
 state observedName = ""
 
 action seed {
-    create Folder in workspace as source {
+    create Folder under workspace as source {
         through source.name = "Source"
         insert source into workspace.folders
     }
     sourceFolder = workspace.folders[0]
 
-    create Folder in sourceFolder as child {
+    create Folder under sourceFolder as child {
         through child.name = "Child"
         insert child into sourceFolder.folders
     }
     selectedChild = sourceFolder.folders[0]
 
-    create Folder in selectedChild as grandchild {
+    create Folder under selectedChild as grandchild {
         through grandchild.name = "Grandchild"
         insert grandchild into selectedChild.folders
     }
@@ -45,15 +45,15 @@ action seed {
 }
 
 action attemptCycle {
-    transfer selectedChild from sourceFolder to selectedGrandchild
+    reroot selectedChild from sourceFolder to selectedGrandchild
 }
 
 action proveSourceStillOwnsChild {
-    transfer selectedChild from sourceFolder to sourceFolder
+    reroot selectedChild from sourceFolder to sourceFolder
 }
 
 action proveChildStillOwnsGrandchild {
-    transfer selectedGrandchild from selectedChild to selectedChild
+    reroot selectedGrandchild from selectedChild to selectedChild
 }
 
 action readSelectedName {
@@ -82,24 +82,24 @@ state selectedChild: maybe live Folder = none
 state candidateDestination: maybe live Folder = none
 
 action seed {
-    create Folder in workspace as source {
+    create Folder under workspace as source {
         through source.name = "Source"
         insert source into workspace.folders
     }
-    create Folder in workspace as destination {
+    create Folder under workspace as destination {
         through destination.name = "Destination"
         insert destination into workspace.folders
     }
     sourceFolder = workspace.folders[0]
     destinationFolder = workspace.folders[1]
 
-    create Folder in sourceFolder as child {
+    create Folder under sourceFolder as child {
         through child.name = "Child"
         insert child into sourceFolder.folders
     }
     selectedChild = sourceFolder.folders[0]
 
-    create Folder in destinationFolder as candidate {
+    create Folder under destinationFolder as candidate {
         through candidate.name = "Candidate"
         insert candidate into destinationFolder.folders
     }
@@ -107,16 +107,16 @@ action seed {
 }
 
 action attemptStagedCycle {
-    transfer candidateDestination from destinationFolder to selectedChild
-    transfer selectedChild from sourceFolder to candidateDestination
+    reroot candidateDestination from destinationFolder to selectedChild
+    reroot selectedChild from sourceFolder to candidateDestination
 }
 
 action proveSourceStillOwnsChild {
-    transfer selectedChild from sourceFolder to sourceFolder
+    reroot selectedChild from sourceFolder to sourceFolder
 }
 
 action proveDestinationStillOwnsCandidate {
-    transfer candidateDestination from destinationFolder to destinationFolder
+    reroot candidateDestination from destinationFolder to destinationFolder
 }
 "#;
 

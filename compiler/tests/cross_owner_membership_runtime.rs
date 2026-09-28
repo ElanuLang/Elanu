@@ -38,7 +38,7 @@ action rename(state target: String, value: String) {
 }
 
 action seedCrossOwnerMembership {
-    create Task in left as task {
+    create Task under left as task {
         through task.title = "Shared"
         insert task into right.tasks
     }
@@ -174,11 +174,11 @@ state moving: maybe live Task = none
 state anchor: maybe live Task = none
 
 action seed {
-    create Task in left as first {
+    create Task under left as first {
         insert first into left.tasks
         insert first into right.tasks
     }
-    create Task in left as second {
+    create Task under left as second {
         insert second into left.tasks
         insert second into right.tasks
     }

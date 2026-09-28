@@ -31,15 +31,15 @@ state presenceObserved = false
 state stagedCounter = 0
 
 action seedAndSelectSecond {
-    create Task in workstation as first {
+    create Task under workstation as first {
         through first.title = "Alpha"
         insert first into workstation.tasks
     }
-    create Task in workstation as second {
+    create Task under workstation as second {
         through second.title = "Bravo"
         insert second into workstation.tasks
     }
-    create Task in workstation as third {
+    create Task under workstation as third {
         through third.title = "Charlie"
         insert third into workstation.tasks
     }
@@ -86,12 +86,12 @@ action searchBackAfterClear {
 }
 
 action addDuplicateAndSelect {
-    create Task in workstation as earlier {
+    create Task under workstation as earlier {
         through earlier.title = "Able"
         through earlier.active = false
         insert earlier into workstation.tasks
     }
-    create Task in workstation as duplicate {
+    create Task under workstation as duplicate {
         through duplicate.title = "Echo"
         insert duplicate into workstation.tasks
         insert duplicate into workstation.tasks

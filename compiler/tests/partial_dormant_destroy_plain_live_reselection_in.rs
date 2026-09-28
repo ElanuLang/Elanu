@@ -22,13 +22,13 @@ state pinned: live Node = live right
 state observedName = ""
 
 action seed {
-    create Node in left as doomedNode {
+    create Node under left as doomedNode {
         through doomedNode.name = "Doomed leaf"
         insert doomedNode into left.children
         selected = doomedNode
     }
 
-    create Node in right as survivorNode {
+    create Node under right as survivorNode {
         through survivorNode.name = "Survivor"
         insert survivorNode into right.children
         survivor = survivorNode
@@ -38,15 +38,15 @@ action seed {
 
 action reselectInThenDestroy {
     pinned = left.children[0]
-    destroy selected in left
+    destroy selected under left
 }
 
 action proveLeftOwnsSelected {
-    transfer selected from left to left
+    reroot selected from left to left
 }
 
 action proveRightOwnsSurvivor {
-    transfer survivor from right to right
+    reroot survivor from right to right
 }
 
 action readPinnedName {

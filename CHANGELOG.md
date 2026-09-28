@@ -4,15 +4,17 @@
 
 ### Language and semantics
 
+- Clarified lifetime/rooting source vocabulary without changing semantics: `create ... under ...`, `reroot ... from ... to ...`, `destroy ... under ...`, and `purge ... under ...` now distinguish provenance operations from structural `insert ... into ...` / `remove ... from ...`.
+
 - Added model-local `maybe live T` state so each concrete modeled identity can persist zero-or-one exact related live identity without encoding a singular relation as `[live T]` structure.
 - Model-local optional designations remain non-owning, transactional, and subject to existing lifetime cleanup; model-local plain `live T`, general nullability/`Option`, and first-class designation values remain unselected.
-- Added explicit `purge target in owner` for permanent termination of a committed transaction-visible lifetime-provenance subtree while retaining leaf-only `destroy` as a separate operation.
+- Added explicit `purge target under owner` for permanent termination of a committed transaction-visible lifetime-provenance subtree while retaining leaf-only `destroy` as a separate operation.
 - Purge discovers descendants from provenance rather than structure, reuses existing leaf cleanup leaves-first, observes staged transfers, blocks on plain-live designations, and rejects fresh transaction-local descendants.
 - Broadened existing lifetime `transfer` from leaf-only children to any committed dynamic identity when replacing its parent provenance edge preserves an acyclic transaction-visible provenance relation.
 - Non-leaf transfer preserves all descendant provenance edges; it is parent-edge replacement, not subtree migration, and `destroy` remains leaf-only.
 - Extended existing-designation structural insertion/removal to mutable membership owned by exact runtime-selected modeled identities carried through persistent live designations.
 - Dynamic-owner structural edits remain non-owning and compose transactionally with independent lifetime provenance transfer.
-- Added bounded lifetime provenance transfer with `transfer target from sourceOwner to destinationOwner` for existing committed dynamic leaf children.
+- Added bounded lifetime provenance transfer with `reroot target from sourceOwner to destinationOwner` for existing committed dynamic leaf children.
 - Transfer preserves exact child identity, persistent designation targets, writable authority, and all structural memberships while transactionally replacing only the authoritative root owner.
 - The source owner must prove current provenance; the destination must be a live modeled identity; subtree transfer, implicit structural reparenting, and general ownership/borrowing remain unselected.
 - Creation-scoped fresh child designations may be assigned directly to compatible persistent
@@ -24,7 +26,7 @@
 - Scoped owner-relative creation may root a fresh dynamic child in another exact live modeled
   child identity carried by an enclosing fresh scoped designation or persistent `live T` /
   present `maybe live T` state.
-- `destroy target in owner` may prove dynamic root provenance through persistent live owner
+- `destroy target under owner` may prove dynamic root provenance through persistent live owner
   designation state while still requiring exact equality with the child's recorded rooting owner.
 - Dynamic owner designations remain non-owning identity carriers; descendant presence still
   blocks parent destruction and no cascade, reparenting, or ownership-transfer semantics were added.
@@ -64,6 +66,8 @@ Elanu v0.9.0 promotes the post-v0.8.0 workstation composition work into the curr
 
 ### Language and semantics
 
+- Clarified lifetime/rooting source vocabulary without changing semantics: `create ... under ...`, `reroot ... from ... to ...`, `destroy ... under ...`, and `purge ... under ...` now distinguish provenance operations from structural `insert ... into ...` / `remove ... from ...`.
+
 - Renamed the language to **Elanu**, the compiler/package/binary to `elanu`, and adopted `.elnu` as the canonical source-file extension convention without changing established semantics.
 - Added owner-relative dynamic modeled-state child creation and scoped creation/insertion while preserving transaction-local fresh identity.
 - Added runtime-sized indexed designation/member access and exact indexed writable-authority grants.
@@ -97,6 +101,8 @@ The previously identified workstation selection/removal/reorder blockers now com
 Meld v0.8.0 promotes the post-v0.7.1 composition work into the current language baseline.
 
 ### Language and semantics
+
+- Clarified lifetime/rooting source vocabulary without changing semantics: `create ... under ...`, `reroot ... from ... to ...`, `destroy ... under ...`, and `purge ... under ...` now distinguish provenance operations from structural `insert ... into ...` / `remove ... from ...`.
 
 - Added `state model` reusable modeled-state shapes with distinct live constituent identities.
 - Added `live T` non-owning designations.

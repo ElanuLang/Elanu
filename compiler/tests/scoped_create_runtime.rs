@@ -24,7 +24,7 @@ state observedQuantity = 0
 state observedTotal = 0.0
 
 action commitScopedCreate {
-    create LineItem in invoice as line {
+    create LineItem under invoice as line {
         through line.quantity = 3
         observedQuantity = line.quantity
         observedTotal = line.lineTotal
@@ -32,7 +32,7 @@ action commitScopedCreate {
 }
 
 action rollbackScopedCreate {
-    create LineItem in invoice as line {
+    create LineItem under invoice as line {
         through line.quantity = 7
         observedQuantity = line.quantity
         observedTotal = line.lineTotal
@@ -85,7 +85,7 @@ state invoice: Invoice
 state observed = 0
 
 action invalidEscape {
-    create LineItem in invoice as line {
+    create LineItem under invoice as line {
         observed = line.quantity
     }
     observed = line.quantity

@@ -35,22 +35,22 @@ state observedCount = 99
 derived currentSelected = workstation.selected
 
 action seedThree {
-    create Task in workstation as first {
+    create Task under workstation as first {
         through first.title = "A"
         insert first into workstation.tasks
     }
-    create Task in workstation as second {
+    create Task under workstation as second {
         through second.title = "B"
         insert second into workstation.tasks
     }
-    create Task in workstation as third {
+    create Task under workstation as third {
         through third.title = "C"
         insert third into workstation.tasks
     }
 }
 
 action seedOne {
-    create Task in workstation as only {
+    create Task under workstation as only {
         through only.title = "Only"
         insert only into workstation.tasks
     }

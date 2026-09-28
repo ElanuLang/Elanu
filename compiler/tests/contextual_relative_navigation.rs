@@ -33,15 +33,15 @@ state observed = ""
 state marker = 0
 
 action setup {
-    create Task in workstation as a {
+    create Task under workstation as a {
         through a.title = "A"
         insert a into workstation.tasks
     }
-    create Task in workstation as b {
+    create Task under workstation as b {
         through b.title = "B"
         insert b into workstation.tasks
     }
-    create Task in workstation as c {
+    create Task under workstation as c {
         through c.title = "C"
         insert c into workstation.tasks
     }
@@ -73,7 +73,7 @@ action stagedPredicateThenNext {
 
 action stagedStructureThenNext {
     selected = workstation.tasks[2]
-    create Task in workstation as d {
+    create Task under workstation as d {
         through d.title = "D"
         insert d into workstation.tasks
     }
@@ -94,16 +94,16 @@ action zeroOccurrenceFails {
 }
 
 action setupDuplicateOccurrence {
-    create Task in workstation as a {
+    create Task under workstation as a {
         through a.title = "A"
         insert a into workstation.tasks
     }
-    create Task in workstation as b {
+    create Task under workstation as b {
         through b.title = "B"
         insert b into workstation.tasks
         insert b into workstation.tasks
     }
-    create Task in workstation as c {
+    create Task under workstation as c {
         through c.title = "C"
         insert c into workstation.tasks
     }

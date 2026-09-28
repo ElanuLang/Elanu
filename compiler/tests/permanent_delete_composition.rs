@@ -26,13 +26,13 @@ state selected: maybe live Document = none
 state recent: maybe live Document = none
 
 action seed {
-    create Document in workspace as first {
+    create Document under workspace as first {
         through first.title = "First"
         insert first into workspace.active
         insert first into searchIndex.cached
         insert first into searchIndex.cached
     }
-    create Document in workspace as second {
+    create Document under workspace as second {
         through second.title = "Second"
         insert second into workspace.active
     }
@@ -51,7 +51,7 @@ action restoreSelected {
 }
 
 action permanentlyDeleteSelected {
-    destroy selected in workspace
+    destroy selected under workspace
 }
 "#;
 

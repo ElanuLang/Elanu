@@ -11,7 +11,7 @@ pub const TRANSFER_BUILTIN_ACTION: &str = "__elanu_surface_transfer_child_builti
 
 /// Preprocess the intentionally narrow rooted-child lifetime transfer surface:
 ///
-/// `transfer selected from left to right`
+/// `reroot selected from left to right`
 ///
 /// Target and dynamic owner operands remain ordinary persistent designation names until
 /// live-designation lowering converts them to private identity carriers. Static modeled
@@ -47,7 +47,7 @@ pub fn preprocess(source: &str) -> Result<String, Vec<Diagnostic>> {
             continue;
         }
 
-        if keyword_at(source, index, "transfer") {
+        if keyword_at(source, index, "reroot") {
             if let Some((end, target, source_owner, destination_owner)) =
                 parse_transfer_statement(source, index)
             {
@@ -208,7 +208,7 @@ fn validate_statements(
                 if !designations.contains_key(target) {
                     errors.push(Diagnostic::new(
                         format!(
-                            "transfer requires persistent live or maybe live designation state; '{target}' is not one"
+                            "reroot requires persistent live or maybe live designation state; '{target}' is not one"
                         ),
                         location.line,
                         location.column,
@@ -222,7 +222,7 @@ fn validate_statements(
                     if !roots.contains_key(owner) && !designations.contains_key(owner) {
                         errors.push(Diagnostic::new(
                             format!(
-                                "transfer {role} owner '{owner}' is not a modeled-state root or persistent live designation"
+                                "reroot {role} owner '{owner}' is not a modeled-state root or persistent live designation"
                             ),
                             location.line,
                             location.column,
@@ -246,7 +246,7 @@ fn validate_statements(
 }
 
 fn parse_transfer_statement(source: &str, start: usize) -> Option<(usize, String, String, String)> {
-    let mut index = start + "transfer".len();
+    let mut index = start + "reroot".len();
     index = skip_inline_whitespace(source, index);
 
     let (target, next) = parse_identifier(source, index)?;
@@ -368,7 +368,7 @@ mod tests {
 
     #[test]
     fn preprocesses_transfer_statement_and_injects_private_builtin() {
-        let source = "action moveOwnership {\n    transfer selected from left to right\n}\n";
+        let source = "action moveOwnership {\n    reroot selected from left to right\n}\n";
         let output = preprocess(source).unwrap();
         assert!(output.contains("__elanu_surface_transfer_child_builtin(selected, left, right)"));
         assert!(output.contains(
@@ -378,7 +378,7 @@ mod tests {
 
     #[test]
     fn transfer_inside_string_or_comment_is_not_rewritten() {
-        let source = "// transfer selected from left to right\nderived text = \"transfer selected from left to right\"\n";
+        let source = "// reroot selected from left to right\nderived text = \"reroot selected from left to right\"\n";
         assert_eq!(preprocess(source).unwrap(), source);
     }
 
@@ -393,8 +393,8 @@ state right: Folder
 state plain: live Document = live fallback
 state optional: maybe live Document = none
 
-action transferPlain { transfer plain from left to right }
-action transferOptional { transfer optional from left to right }
+action transferPlain { reroot plain from left to right }
+action transferOptional { reroot optional from left to right }
 "#;
         crate::check_source(source).expect("both persistent designation forms should check");
     }
@@ -409,7 +409,7 @@ state right: Folder
 state ordinary = 0
 
 action invalid {
-    transfer ordinary from ordinary to right
+    reroot ordinary from ordinary to right
 }
 "#;
         let errors = crate::check_source(source).expect_err("invalid transfer should fail");
@@ -418,7 +418,7 @@ action invalid {
             .contains("requires persistent live or maybe live")));
         assert!(errors
             .iter()
-            .any(|error| error.message.contains("transfer source owner 'ordinary'")));
+            .any(|error| error.message.contains("reroot source owner 'ordinary'")));
     }
 
     #[test]
@@ -431,7 +431,7 @@ state right: Folder
 state selected: maybe live Document = none
 
 action seed {
-    create Document in left as document {
+    create Document under left as document {
         through document.title = "Draft"
         insert document into left.documents
         insert document into right.documents
@@ -440,15 +440,15 @@ action seed {
 }
 
 action transferSelected {
-    transfer selected from left to right
+    reroot selected from left to right
 }
 
 action destroyFromLeft {
-    destroy selected in left
+    destroy selected under left
 }
 
 action destroyFromRight {
-    destroy selected in right
+    destroy selected under right
 }
 "#;
         let checked = crate::check_source_with_runtime_models(source).expect("source should check");
@@ -496,23 +496,23 @@ state right: Folder
 state selected: maybe live Document = none
 
 action absentTransfer {
-    transfer selected from left to right
+    reroot selected from left to right
 }
 
 action seed {
-    create Document in left as document {
+    create Document under left as document {
         insert document into left.documents
     }
     selected = left.documents[0]
 }
 
 action transferThenFail {
-    transfer selected from left to right
+    reroot selected from left to right
     fail "abort"
 }
 
 action destroyFromLeft {
-    destroy selected in left
+    destroy selected under left
 }
 "#;
         let checked = crate::check_source_with_runtime_models(source).expect("source should check");

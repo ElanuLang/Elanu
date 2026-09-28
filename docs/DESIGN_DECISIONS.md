@@ -443,7 +443,7 @@ Decision:
 The selected source form is currently:
 
 ```elanu
-destroy selected in workspace
+destroy selected under workspace
 ```
 
 where `selected` is persistent `maybe live T` state. The owner operand must resolve to the
@@ -494,7 +494,7 @@ Revisit only when realistic composition demonstrates one of those stronger facts
 Decision:
 
 ```elanu
-purge selected in owner
+purge selected under owner
 ```
 
 is the explicit subtree-ending counterpart to leaf-only `destroy`.
@@ -502,11 +502,11 @@ is the explicit subtree-ending counterpart to leaf-only `destroy`.
 The durable semantic distinction is:
 
 ```text
-destroy child in owner
+destroy child under owner
     -> end exactly this committed identity
     -> fail if it still roots a live dynamic child
 
-purge child in owner
+purge child under owner
     -> intentionally end this committed identity
        plus all committed transaction-visible provenance descendants
 ```
@@ -553,7 +553,7 @@ same existing child identity may need a different exact root-provenance owner.
 Decision:
 
 ```elanu
-transfer selected from leftFolder to rightFolder
+reroot selected from leftFolder to rightFolder
 ```
 
 changes only the authoritative root/lifetime provenance of the exact designated committed dynamic
@@ -799,7 +799,7 @@ of model `T` rooted in the named owner/state world.
 The current accepted base spelling is:
 
 ```elanu
-create T in owner
+create T under owner
 ```
 
 The durable semantic law is:
@@ -822,7 +822,7 @@ transaction scope.
 The current provisional spelling is:
 
 ```elanu
-create T in owner as item {
+create T under owner as item {
     // item designates exactly the fresh T identity
 }
 ```
@@ -867,7 +867,7 @@ Structural insertion has shown that both fresh and persistent designations can f
 into compatible membership without broader scalar `live T` flow. That membership may
 belong to another modeled-state root without changing the child's creation owner. Do
 not infer a general constructor, allocation primitive, local-variable system,
-reference model, or ownership-transfer mechanism from the create/insertion experiments.
+reference model, or ownership-reroot mechanism from the create/insertion experiments.
 
 ---
 
@@ -1088,7 +1088,7 @@ membership owner and the child's lifetime/rooting owner are separate facts.
 Representative provisional source shapes are:
 
 ```elanu
-create LineItem in invoice as line {
+create LineItem under invoice as line {
     insert line into otherInvoice.lines
 }
 
