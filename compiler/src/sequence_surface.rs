@@ -104,7 +104,7 @@ pub fn preprocess(source: &str) -> Result<String, Vec<Diagnostic>> {
                 format!("[{inner}]")
             } else {
                 errors.push(Diagnostic::new(
-                    "bootstrap ordered-sequence types currently require a primitive element type or '[live <StateModel>]'",
+                    "bootstrap ordered-sequence literals currently contain only 'live <state-binding>' elements",
                     start_line,
                     start_column,
                 ));
