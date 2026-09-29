@@ -1005,7 +1005,7 @@ impl Runtime {
             Value::String(owner) => owner,
             other => {
                 return Err(RuntimeError::new(format!(
-                    "internal child-reroot source owner must be String, got {}",
+                    "internal child-transfer source owner must be String, got {}",
                     other.type_name()
                 )));
             }
@@ -1019,7 +1019,7 @@ impl Runtime {
             Value::String(owner) => owner,
             other => {
                 return Err(RuntimeError::new(format!(
-                    "internal child-reroot destination owner must be String, got {}",
+                    "internal child-transfer destination owner must be String, got {}",
                     other.type_name()
                 )));
             }

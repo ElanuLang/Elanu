@@ -1248,7 +1248,7 @@ Current contract:
   whole purge rather than becoming dangling;
 - a fresh transaction-local descendant anywhere in the selected subtree currently blocks purge because
   fresh-child cancellation/termination remains unselected;
-- purge participates under the surrounding action transaction, so any failure rolls the entire subtree
+- purge participates in the surrounding action transaction, so any failure rolls the entire subtree
   transition and all other staged work back.
 
 Moving a folder to Trash does not imply purge. A rooted hierarchy may be moved cheaply by provenance

@@ -867,7 +867,7 @@ Structural insertion has shown that both fresh and persistent designations can f
 into compatible membership without broader scalar `live T` flow. That membership may
 belong to another modeled-state root without changing the child's creation owner. Do
 not infer a general constructor, allocation primitive, local-variable system,
-reference model, or ownership-reroot mechanism from the create/insertion experiments.
+reference model, or ownership-transfer mechanism from the create/insertion experiments.
 
 ---
 
