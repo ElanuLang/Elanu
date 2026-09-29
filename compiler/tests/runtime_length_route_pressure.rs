@@ -270,17 +270,14 @@ action acceptFolders(route: [live Folder]) {
     );
 }
 
-/// Probe the most obvious source representation for presentation-owned route
-/// indices.
+/// `[Int]` is part of the established ordered-sequence semantic surface, but
+/// the current bootstrap compiler does not accept sequence-valued action
+/// parameters.
 ///
-/// Current ordered sequences are `[live T]` structural designation sequences.
-/// This test records that `[Int]` is not already an accepted general sequence
-/// parameter surface.
-///
-/// If this unexpectedly starts parsing in the future, the pressure must be
-/// reconsidered rather than silently preserving this negative assertion.
+/// This records an implementation/composition boundary, not evidence that
+/// scalar sequences are absent from Elanu's language model.
 #[test]
-fn scalar_route_sequence_is_not_already_an_action_parameter_surface() {
+fn scalar_sequence_action_parameter_is_not_currently_implemented() {
     let source = r#"
 action replay(route: [Int]) {
 }
@@ -288,6 +285,6 @@ action replay(route: [Int]) {
 
     assert!(
         parse_source(source).is_err(),
-        "the current language unexpectedly accepts `[Int]` action parameters"
+        "the current compiler unexpectedly accepts `[Int]` action parameters"
     );
 }
