@@ -5,17 +5,19 @@
 //! replay an arbitrary number of route segments as one Elanu transition using
 //! the current surface.
 //!
-//! This file adds no mechanism. It records two negative facts:
+//! This file adds no route-consumption mechanism. It records the remaining
+//! composition pressure:
 //!
 //! 1. repeated top-level host action calls are separate transactions;
-//! 2. the current source surface does not accept a scalar `[Int]` route parameter.
+//! 2. `[Int]` can now cross the plain runtime action boundary, but the
+//!    partial-persistent host bridge still cannot carry that structured value.
 //!
 //! Neither result selects a solution.
 
 use std::collections::HashMap;
 
 use elanu_compiler::{
-    check_source_with_runtime_models, parse_source,
+    check_source_with_runtime_models,
     runtime::{
         persistence::partial::{PartialPersistenceProvider, PartialPersistentRuntime},
         RuntimeError, Value,
@@ -208,9 +210,8 @@ action replayTwo(first: Int, second: Int) {
 /// host boundary deliberately refuses to translate such a value into an action
 /// argument.
 ///
-/// This is independent of the separate source limitation that sequence-valued
-/// action parameters are not currently supported. A future transient scalar
-/// sequence must not reuse this identity-bearing representation.
+/// Ordinary scalar sequences now have their own runtime representation.
+/// They must remain distinct from this identity-bearing carrier.
 #[test]
 fn modeled_identity_sequence_is_not_a_transient_host_value_carrier() {
     let mut runtime = runtime();
@@ -270,21 +271,49 @@ action acceptFolders(route: [live Folder]) {
     );
 }
 
-/// `[Int]` is part of the established ordered-sequence semantic surface, but
-/// the current bootstrap compiler does not accept sequence-valued action
-/// parameters.
+/// Ordinary `[Int]` action parameters now check, and the plain runtime can
+/// receive a runtime-sized `ValueSequence`.
 ///
-/// This records an implementation/composition boundary, not evidence that
-/// scalar sequences are absent from Elanu's language model.
+/// The partial-persistent host bridge is still narrower: it reconstructs host
+/// values as source-shaped action arguments, and therefore cannot yet carry an
+/// ordinary sequence value.
+///
+/// This isolates the remaining representation obstacle before route traversal:
+/// preserve the already-structured ordinary sequence through the
+/// partial-persistence action boundary without reparsing or inventing source
+/// expression structure.
 #[test]
-fn scalar_sequence_action_parameter_is_not_currently_implemented() {
-    let source = r#"
-action replay(route: [Int]) {
+fn partial_persistent_host_bridge_does_not_yet_carry_ordinary_sequences() {
+    let source = format!(
+        "{CABINET}\n{}",
+        r#"
+action acceptRoute(route: [Int]) {
 }
-"#;
+"#
+    );
+
+    let checked =
+        check_source_with_runtime_models(&source).expect("[Int] action parameter should check");
+
+    let mut runtime = PartialPersistentRuntime::open(checked, MemoryProvider::default())
+        .expect("partial-persistent runtime should initialize");
+
+    let error = runtime
+        .run_action_with_values(
+            "acceptRoute",
+            &[Value::ValueSequence(vec![
+                Value::Int(0),
+                Value::Int(2),
+                Value::Int(1),
+            ])],
+        )
+        .expect_err("partial-persistent host bridge should not yet carry ordinary sequences");
 
     assert!(
-        parse_source(source).is_err(),
-        "the current compiler unexpectedly accepts `[Int]` action parameters"
+        error
+            .message
+            .contains("do not yet carry ordinary sequences"),
+        "unexpected ordinary-sequence host-bridge rejection: {}",
+        error.message
     );
 }
