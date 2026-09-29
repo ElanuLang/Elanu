@@ -221,6 +221,9 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
 
         match value {
             Value::Int(_) | Value::Float(_) | Value::Bool(_) | Value::String(_) => Ok(value),
+            Value::ValueSequence(_) => Err(RuntimeError::new(format!(
+                "host observation '{designation}.{member}[{index}].{child_member}' exposed non-primitive sequence value"
+            ))),
             Value::Sequence { .. } => Err(RuntimeError::new(format!(
                 "host observation '{designation}.{member}[{index}].{child_member}' exposed structural identity"
             ))),
@@ -806,6 +809,11 @@ fn host_value_action_argument(value: &Value) -> Result<ActionArgument, RuntimeEr
         Value::Float(value) => Expr::Float(*value),
         Value::Bool(value) => Expr::Bool(*value),
         Value::String(value) => Expr::String(value.clone()),
+        Value::ValueSequence(_) => {
+            return Err(RuntimeError::new(
+                "partial persistent host action values do not yet carry ordinary sequences",
+            ));
+        }
         Value::Sequence { .. } => {
             return Err(RuntimeError::new(
                 "partial persistent host action values cannot carry modeled identity sequences",

@@ -330,6 +330,11 @@ fn encode_value(encoder: &mut PersistenceEncoder, value: &Value) -> Result<(), R
             encoder.u8(3);
             encoder.string(value)?;
         }
+        Value::ValueSequence(_) => {
+            return Err(RuntimeError::new(
+                "persistence for ordinary sequence values is not implemented",
+            ));
+        }
         Value::Sequence {
             element_model,
             targets,
