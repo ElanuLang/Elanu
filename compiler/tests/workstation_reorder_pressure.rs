@@ -54,15 +54,15 @@ state workstation: Workstation
 state selectedTask: maybe live Task = none
 
 action seed {
-    create Task in workstation as alpha {
+    create Task under workstation as alpha {
         through alpha.title = "Alpha"
         insert alpha into workstation.tasks
     }
-    create Task in workstation as bravo {
+    create Task under workstation as bravo {
         through bravo.title = "Bravo"
         insert bravo into workstation.tasks
     }
-    create Task in workstation as charlie {
+    create Task under workstation as charlie {
         through charlie.title = "Charlie"
         insert charlie into workstation.tasks
     }
@@ -102,10 +102,10 @@ state workstation: Workstation
 state selectedTask: maybe live Task = none
 
 action seed {
-    create Task in workstation as alpha {
+    create Task under workstation as alpha {
         insert alpha into workstation.tasks
     }
-    create Task in workstation as bravo {
+    create Task under workstation as bravo {
         insert bravo into workstation.tasks
     }
     selectedTask = workstation.tasks[0]

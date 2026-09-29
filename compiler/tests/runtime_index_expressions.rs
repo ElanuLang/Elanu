@@ -28,11 +28,11 @@ action setQuantity(state target: Int, value: Int) {
 }
 
 action setup {
-    create LineItem in invoice as first {
+    create LineItem under invoice as first {
         through first.quantity = 2
         insert first into invoice.lines
     }
-    create LineItem in invoice as second {
+    create LineItem under invoice as second {
         through second.quantity = 3
         insert second into invoice.lines
     }

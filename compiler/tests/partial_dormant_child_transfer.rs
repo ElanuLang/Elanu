@@ -28,16 +28,16 @@ state selectedDocument: maybe live Document = none
 state observedTitle = ""
 
 action seed {
-    create Folder in workspace as source {
+    create Folder under workspace as source {
         insert source into workspace.folders
     }
-    create Folder in workspace as destination {
+    create Folder under workspace as destination {
         insert destination into workspace.folders
     }
     sourceFolder = workspace.folders[0]
     destinationFolder = workspace.folders[1]
 
-    create Document in sourceFolder as document {
+    create Document under sourceFolder as document {
         through document.title = "Dormant transfer"
         insert document into sourceFolder.documents
     }
@@ -45,17 +45,17 @@ action seed {
 }
 
 action moveDocument {
-    transfer selectedDocument from sourceFolder to destinationFolder
+    reroot selectedDocument from sourceFolder to destinationFolder
     insert selectedDocument into destinationFolder.documents
     remove selectedDocument from sourceFolder.documents
 }
 
 action proveDestinationOwner {
-    transfer selectedDocument from destinationFolder to destinationFolder
+    reroot selectedDocument from destinationFolder to destinationFolder
 }
 
 action proveSourceOwner {
-    transfer selectedDocument from sourceFolder to sourceFolder
+    reroot selectedDocument from sourceFolder to sourceFolder
 }
 
 action selectFromSource {

@@ -27,17 +27,17 @@ state selectedTask: maybe live Task = none
 state otherProject: maybe live Project = none
 
 action seed {
-    create Project in workspace as project {
+    create Project under workspace as project {
         through project.name = "Primary"
         insert project into workspace.projects
 
-        create Task in project as task {
+        create Task under project as task {
             through task.title = "Nested"
             insert task into workspace.tasks
         }
     }
 
-    create Project in workspace as project {
+    create Project under workspace as project {
         through project.name = "Other"
         insert project into workspace.projects
     }
@@ -48,26 +48,26 @@ action seed {
 }
 
 action addTaskLater {
-    create Task in selectedProject as task {
+    create Task under selectedProject as task {
         through task.title = "Later"
         insert task into workspace.tasks
     }
 }
 
 action destroyParentTooEarly {
-    destroy selectedProject in workspace
+    destroy selectedProject under workspace
 }
 
 action destroyTaskThroughWrongProject {
-    destroy selectedTask in otherProject
+    destroy selectedTask under otherProject
 }
 
 action destroySelectedTask {
-    destroy selectedTask in selectedProject
+    destroy selectedTask under selectedProject
 }
 
 action destroySelectedProject {
-    destroy selectedProject in workspace
+    destroy selectedProject under workspace
 }
 "#;
 
@@ -168,7 +168,7 @@ state workspace: Workspace
 state selectedProject: maybe live Project = none
 
 action attempt {
-    create Task in selectedProject as task {
+    create Task under selectedProject as task {
         insert task into workspace.tasks
     }
 }

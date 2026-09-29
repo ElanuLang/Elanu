@@ -28,11 +28,11 @@ state observed = false
 state presentObserved = false
 
 action addTwoAndSelectSecond {
-    create Task in workstation as first {
+    create Task under workstation as first {
         through first.title = "A"
         insert first into workstation.tasks
     }
-    create Task in workstation as second {
+    create Task under workstation as second {
         through second.title = "B"
         insert second into workstation.tasks
     }
@@ -40,7 +40,7 @@ action addTwoAndSelectSecond {
 }
 
 action addDuplicateAndSelect {
-    create Task in workstation as duplicate {
+    create Task under workstation as duplicate {
         through duplicate.title = "D"
         insert duplicate into workstation.tasks
         insert duplicate into workstation.tasks

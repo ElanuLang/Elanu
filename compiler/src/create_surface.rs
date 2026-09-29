@@ -8,7 +8,7 @@ pub const CREATE_BUILTIN_ACTION: &str = "__elanu_surface_create_builtin";
 
 /// Bootstrap preprocessor for the selected owner-relative creation statement:
 ///
-/// `create LineItem in invoice`
+/// `create LineItem under invoice`
 ///
 /// The surface is rewritten to one compiler-private action call whose empty
 /// declaration is appended only when creation is present. Later validation
@@ -158,10 +158,10 @@ fn parse_create_statement(source: &str, start: usize) -> Option<(usize, String, 
 
     let (model, next) = parse_identifier(source, index)?;
     index = skip_inline_whitespace(source, next);
-    if !keyword_at(source, index, "in") {
+    if !keyword_at(source, index, "under") {
         return None;
     }
-    index += "in".len();
+    index += "under".len();
     index = skip_inline_whitespace(source, index);
 
     let (owner, next) = parse_name_path(source, index)?;
@@ -262,7 +262,7 @@ mod tests {
 
     #[test]
     fn preprocesses_create_statement_and_injects_private_builtin() {
-        let source = "action add {\n    create LineItem in invoice\n}\n";
+        let source = "action add {\n    create LineItem under invoice\n}\n";
         let output = preprocess(source).unwrap();
         assert!(output.contains("__elanu_surface_create_builtin(\"LineItem\", \"invoice\")"));
         assert!(output.contains(
@@ -273,7 +273,7 @@ mod tests {
     #[test]
     fn create_inside_string_or_comment_is_not_rewritten() {
         let source =
-            "// create LineItem in invoice\nderived text = \"create LineItem in invoice\"\n";
+            "// create LineItem under invoice\nderived text = \"create LineItem under invoice\"\n";
         assert_eq!(preprocess(source).unwrap(), source);
     }
 
@@ -286,7 +286,7 @@ state model Invoice {
 state invoice: Invoice
 
 action add {
-    create Missing in invoice
+    create Missing under invoice
 }
 "#;
         let errors = crate::check_source(source).expect_err("unknown create model should fail");
@@ -308,7 +308,7 @@ state invoice: Invoice
 state ordinary = 0
 
 action add {
-    create LineItem in ordinary
+    create LineItem under ordinary
 }
 "#;
         let errors = crate::check_source(source).expect_err("non-model owner should fail");

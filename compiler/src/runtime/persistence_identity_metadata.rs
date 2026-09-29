@@ -18,13 +18,13 @@ state workspace: Folder
 state selected: maybe live Folder = none
 
 action seed {
-    create Folder in workspace as folder {
+    create Folder under workspace as folder {
         selected = folder
     }
 }
 
 action deleteSelected {
-    destroy selected in workspace
+    destroy selected under workspace
 }
 "#,
     );
@@ -58,7 +58,7 @@ state model Folder {
 state workspace: Folder
 
 action createThenFail {
-    create Folder in workspace
+    create Folder under workspace
     fail "abort"
 }
 "#,
@@ -87,8 +87,8 @@ state model Document {
 state workspace: Folder
 
 action seed {
-    create Folder in workspace
-    create Document in workspace
+    create Folder under workspace
+    create Document under workspace
 }
 "#,
     );

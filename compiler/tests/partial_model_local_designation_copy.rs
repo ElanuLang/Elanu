@@ -22,11 +22,11 @@ state restoreDestination: maybe live Folder = none
 state observedDestinationName = ""
 
 action seed {
-    create Folder in workspace as source {
+    create Folder under workspace as source {
         through source.name = "Source"
         insert source into workspace.folders
     }
-    create Folder in workspace as selected {
+    create Folder under workspace as selected {
         through selected.name = "Selected"
         insert selected into workspace.folders
     }

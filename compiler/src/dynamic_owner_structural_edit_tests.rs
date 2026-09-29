@@ -28,17 +28,17 @@ derived inSource = selectedDocument is in sourceFolder.documents
 derived inDestination = selectedDocument is in destinationFolder.documents
 
 action seed {
-    create Folder in workspace as left {
+    create Folder under workspace as left {
         insert left into workspace.folders
     }
-    create Folder in workspace as right {
+    create Folder under workspace as right {
         insert right into workspace.folders
     }
 
     sourceFolder = workspace.folders[0]
     destinationFolder = workspace.folders[1]
 
-    create Document in sourceFolder as document {
+    create Document under sourceFolder as document {
         through document.title = "Draft"
         insert document into sourceFolder.documents
         selectedDocument = document
@@ -46,24 +46,24 @@ action seed {
 }
 
 action relocate {
-    transfer selectedDocument from sourceFolder to destinationFolder
+    reroot selectedDocument from sourceFolder to destinationFolder
     insert selectedDocument into destinationFolder.documents
     remove selectedDocument from sourceFolder.documents
 }
 
 action relocateThenFail {
-    transfer selectedDocument from sourceFolder to destinationFolder
+    reroot selectedDocument from sourceFolder to destinationFolder
     insert selectedDocument into destinationFolder.documents
     remove selectedDocument from sourceFolder.documents
     fail "abort"
 }
 
 action destroyFromSource {
-    destroy selectedDocument in sourceFolder
+    destroy selectedDocument under sourceFolder
 }
 
 action destroyFromDestination {
-    destroy selectedDocument in destinationFolder
+    destroy selectedDocument under destinationFolder
 }
 "#;
 

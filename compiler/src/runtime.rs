@@ -985,7 +985,7 @@ impl Runtime {
         let target = match self.eval_expr(target, None)? {
             Value::String(target) if target.is_empty() => {
                 return Err(RuntimeError::new(
-                    "transfer requires a present live designation",
+                    "reroot requires a present live designation",
                 ));
             }
             Value::String(target) => target,
@@ -999,7 +999,7 @@ impl Runtime {
         let source_owner = match self.eval_expr(source_owner, None)? {
             Value::String(owner) if owner.is_empty() => {
                 return Err(RuntimeError::new(
-                    "transfer requires a present source owner designation",
+                    "reroot requires a present source owner designation",
                 ));
             }
             Value::String(owner) => owner,
@@ -1013,7 +1013,7 @@ impl Runtime {
         let destination_owner = match self.eval_expr(destination_owner, None)? {
             Value::String(owner) if owner.is_empty() => {
                 return Err(RuntimeError::new(
-                    "transfer requires a present destination owner designation",
+                    "reroot requires a present destination owner designation",
                 ));
             }
             Value::String(owner) => owner,
@@ -3463,11 +3463,11 @@ action reject {
 }
 
 action createLine {
-    create LineItem in invoice
+    create LineItem under invoice
 }
 
 action createThenReject {
-    create LineItem in invoice
+    create LineItem under invoice
     fail "reject source-created child"
 }
 "#;

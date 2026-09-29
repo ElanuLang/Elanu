@@ -40,17 +40,17 @@ action setPoints(state target: Int, value: Int) {
 }
 
 action seed {
-    create Task in workstation as first {
+    create Task under workstation as first {
         through first.title = "Steel Bolt"
         through first.points = 3
         insert first into workstation.tasks
     }
-    create Task in workstation as second {
+    create Task under workstation as second {
         through second.title = "Brass Washer"
         through second.points = 5
         insert second into workstation.tasks
     }
-    create Task in workstation as third {
+    create Task under workstation as third {
         through third.title = "Bolt Cutter"
         through third.active = false
         through third.points = 8

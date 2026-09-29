@@ -29,19 +29,19 @@ state selectedDocument: maybe live Document = none
 derived selectedTitle = selectedDocument.title
 
 action seed {
-    create Folder in workspace as folder {
+    create Folder under workspace as folder {
         insert folder into workspace.folders
     }
     selectedFolder = workspace.folders[0]
 
-    create Document in selectedFolder as existing {
+    create Document under selectedFolder as existing {
         through existing.title = "Existing"
         insert existing into selectedFolder.documents
     }
 }
 
 action createAfterRestart {
-    create Document in selectedFolder as document {
+    create Document under selectedFolder as document {
         through document.title = "Created after restart"
         insert document into selectedFolder.documents
         selectedDocument = document

@@ -23,27 +23,27 @@ state outsider: maybe live Node = none
 state observedName = ""
 
 action seed {
-    create Node in left as rootNode {
+    create Node under left as rootNode {
         through rootNode.name = "Root"
         insert rootNode into left.children
     }
     root = left.children[0]
 
-    create Node in root as childNode {
+    create Node under root as childNode {
         through childNode.name = "Child"
         insert childNode into root.children
         insert childNode into right.children
     }
     child = root.children[0]
 
-    create Node in child as grandchildNode {
+    create Node under child as grandchildNode {
         through grandchildNode.name = "Grandchild"
         insert grandchildNode into child.children
         insert grandchildNode into right.children
     }
     grandchild = child.children[0]
 
-    create Node in right as outsiderNode {
+    create Node under right as outsiderNode {
         through outsiderNode.name = "Outsider"
         insert outsiderNode into right.children
     }
@@ -51,15 +51,15 @@ action seed {
 }
 
 action purgeRoot {
-    purge root in left
+    purge root under left
 }
 
 action proveRightOwnsOutsider {
-    transfer outsider from right to right
+    reroot outsider from right to right
 }
 
 action proveRootStillLive {
-    transfer root from left to left
+    reroot root from left to left
 }
 
 action selectFirstRight {

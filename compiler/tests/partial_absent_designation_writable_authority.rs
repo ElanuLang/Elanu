@@ -22,7 +22,7 @@ state selected: maybe live Document = none
 state observedSelected = ""
 
 action seed {
-    create Document in folder as first {
+    create Document under folder as first {
         through first.title = "First"
         insert first into folder.documents
     }

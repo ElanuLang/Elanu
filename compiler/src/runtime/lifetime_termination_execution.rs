@@ -56,7 +56,7 @@ state selected: maybe live Task = none
 state recent: maybe live Task = none
 
 action seed {
-    create Task in left as task {
+    create Task under left as task {
         through task.title = "Draft"
         insert task into left.tasks
         insert task into right.tasks
@@ -169,7 +169,7 @@ state selected: maybe live Task = none
 state marker = 0
 
 action seed {
-    create Task in board as task {
+    create Task under board as task {
         through task.title = "Kept"
         insert task into board.tasks
     }
@@ -274,24 +274,24 @@ state outsider: maybe live Node = none
 state required: live Node = live fallback
 
 action seedSubtree {
-    create Node in left as rootNode {
+    create Node under left as rootNode {
         insert rootNode into left.children
     }
     root = left.children[0]
 
-    create Node in root as childNode {
+    create Node under root as childNode {
         insert childNode into root.children
         insert childNode into right.children
     }
     child = root.children[0]
 
-    create Node in child as grandchildNode {
+    create Node under child as grandchildNode {
         insert grandchildNode into child.children
         insert grandchildNode into right.children
     }
     grandchild = child.children[0]
 
-    create Node in right as outsiderNode {
+    create Node under right as outsiderNode {
         insert outsiderNode into right.children
     }
     outsider = right.children[2]
@@ -302,7 +302,7 @@ action pinChild {
 }
 
 action purgeRoot {
-    purge root in left
+    purge root under left
 }
 "#;
 

@@ -27,12 +27,12 @@ state selectedFolder: maybe live Folder = none
 state selectedDocument: maybe live Document = none
 
 action seed {
-    create Folder in workspace as folder {
+    create Folder under workspace as folder {
         insert folder into workspace.folders
     }
     selectedFolder = workspace.folders[0]
 
-    create Document in selectedFolder as document {
+    create Document under selectedFolder as document {
         through document.title = "Existing"
         insert document into selectedFolder.documents
     }
@@ -40,7 +40,7 @@ action seed {
 }
 
 action destroySelected {
-    destroy selectedDocument in selectedFolder
+    destroy selectedDocument under selectedFolder
 }
 
 action selectFirstDocument {

@@ -27,17 +27,17 @@ state otherFolder: maybe live Folder = none
 state selectedDocument: maybe live Document = none
 
 action seed {
-    create Folder in workspace as firstFolder {
+    create Folder under workspace as firstFolder {
         insert firstFolder into workspace.folders
     }
-    create Folder in workspace as secondFolder {
+    create Folder under workspace as secondFolder {
         insert secondFolder into workspace.folders
     }
 
     selectedFolder = workspace.folders[0]
     otherFolder = workspace.folders[1]
 
-    create Document in selectedFolder as document {
+    create Document under selectedFolder as document {
         through document.title = "Shared structurally"
         insert document into selectedFolder.documents
         insert document into otherFolder.documents
@@ -46,7 +46,7 @@ action seed {
 }
 
 action destroySelected {
-    destroy selectedDocument in selectedFolder
+    destroy selectedDocument under selectedFolder
 }
 
 action selectFirstOther {

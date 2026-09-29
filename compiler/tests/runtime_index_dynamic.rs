@@ -41,12 +41,12 @@ action selectSecond {
 }
 
 action setup {
-    create LineItem in invoice as first {
+    create LineItem under invoice as first {
         through first.quantity = 2
         through first.unitPrice = 5.0
         insert first into invoice.lines
     }
-    create LineItem in invoice as second {
+    create LineItem under invoice as second {
         through second.quantity = 3
         through second.unitPrice = 7.0
         insert second into invoice.lines

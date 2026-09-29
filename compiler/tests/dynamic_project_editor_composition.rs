@@ -37,27 +37,27 @@ state observedTitle = ""
 state selectedStillVisible = false
 
 action seed {
-    create Project in workspace as project {
+    create Project under workspace as project {
         projectA = project
         selectedProject = project
         insert project into workspace.projects
     }
 
-    create Task in projectA as task {
+    create Task under projectA as task {
         through task.title = "Alpha"
         insert task into projectA.tasks
         selectedTask = task
     }
-    create Task in projectA as task {
+    create Task under projectA as task {
         through task.title = "Bravo"
         insert task into projectA.tasks
     }
 
-    create Project in workspace as project {
+    create Project under workspace as project {
         projectB = project
         insert project into workspace.projects
     }
-    create Task in projectB as task {
+    create Task under projectB as task {
         through task.title = "Delta"
         insert task into projectB.tasks
     }
@@ -77,7 +77,7 @@ action switchProject {
 }
 
 action destroySelected {
-    destroy selectedTask in selectedProject
+    destroy selectedTask under selectedProject
 }
 "#;
 

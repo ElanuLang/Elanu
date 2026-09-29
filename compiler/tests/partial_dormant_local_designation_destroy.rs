@@ -29,17 +29,17 @@ state selectedDocument: maybe live Document = none
 state observedPinned: maybe live Document = none
 
 action seed {
-    create Folder in workspace as firstFolder {
+    create Folder under workspace as firstFolder {
         insert firstFolder into workspace.folders
     }
-    create Folder in workspace as secondFolder {
+    create Folder under workspace as secondFolder {
         insert secondFolder into workspace.folders
     }
 
     selectedFolder = workspace.folders[0]
     otherFolder = workspace.folders[1]
 
-    create Document in selectedFolder as document {
+    create Document under selectedFolder as document {
         through document.title = "Pinned remotely"
         insert document into selectedFolder.documents
     }
@@ -49,7 +49,7 @@ action seed {
 }
 
 action destroySelected {
-    destroy selectedDocument in selectedFolder
+    destroy selectedDocument under selectedFolder
 }
 
 action inspectPinned {
@@ -82,17 +82,17 @@ state selectedDocument: maybe live Document = none
 state observedPinned: maybe live Document = none
 
 action seed {
-    create Folder in workspace as firstFolder {
+    create Folder under workspace as firstFolder {
         insert firstFolder into workspace.folders
     }
-    create Folder in workspace as secondFolder {
+    create Folder under workspace as secondFolder {
         insert secondFolder into workspace.folders
     }
 
     selectedFolder = workspace.folders[0]
     otherFolder = workspace.folders[1]
 
-    create Document in selectedFolder as document {
+    create Document under selectedFolder as document {
         through document.title = "Pinned remotely"
         insert document into selectedFolder.documents
     }
@@ -101,7 +101,7 @@ action seed {
 }
 
 action destroySelected {
-    destroy selectedDocument in selectedFolder
+    destroy selectedDocument under selectedFolder
 }
 
 action inspectPinned {

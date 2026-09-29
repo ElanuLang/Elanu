@@ -873,7 +873,7 @@ The current compiler accepts owner-relative creation as an action statement:
 
 ```elanu
 action addLine {
-    create LineItem in invoice
+    create LineItem under invoice
 }
 ```
 
@@ -881,7 +881,7 @@ It also accepts a provisional creation-scoped designation form:
 
 ```elanu
 action addConfiguredLine {
-    create LineItem in invoice as line {
+    create LineItem under invoice as line {
         through line.quantity = 3
         observedTotal = line.lineTotal
     }
@@ -893,7 +893,7 @@ Current semantic contract:
 - `LineItem` names a `state model`;
 - creation allocates one fresh live modeled-state identity of that model;
 - the fresh identity records one exact rooting owner identity;
-- the existing unscoped `create T in owner` path still accepts a statically declared modeled-state root;
+- the existing unscoped `create T under owner` path still accepts a statically declared modeled-state root;
 - the scoped form additionally accepts an exact current live modeled identity as owner when that identity is carried by a persistent `live T` / present `maybe live T` designation or by an enclosing fresh scoped creation binding;
 - using a live designation as the owner operand does not make the designation owning, grant writable authority, or transfer/reparent any existing child;
 - model state members are initialized from their declared defaults;
@@ -941,7 +941,7 @@ identity into compatible persistent designation state:
 state selectedLine: maybe live LineItem = none
 
 action addAndSelect {
-    create LineItem in invoice as line {
+    create LineItem under invoice as line {
         insert line into invoice.lines
         selectedLine = line
     }
@@ -956,8 +956,8 @@ For example, a dynamic project may root a fresh task without an application-main
 business-key or mirrored owner field:
 
 ```elanu
-create Project in workspace as project {
-    create Task in project as task {
+create Project under workspace as project {
+    create Task under project as task {
         insert task into workspace.tasks
     }
 }
@@ -969,7 +969,7 @@ A committed dynamic owner may likewise be named by persistent designation state:
 state selectedProject: maybe live Project = none
 
 action addTask {
-    create Task in selectedProject as task {
+    create Task under selectedProject as task {
         insert task into workspace.tasks
     }
 }
@@ -980,7 +980,7 @@ creation is transported through compiler-private lowering/generated actions, and
 identity is preserved only in the explicit owner position. Generated names and private
 builtin machinery are not Elanu source semantics.
 
-Neither form of `create T in owner` is a general constructor, general allocation
+Neither form of `create T under owner` is a general constructor, general allocation
 primitive, general local-binding facility, or reference operation.
 
 ---
@@ -994,7 +994,7 @@ lifetime/rooting owner.
 A fresh creation-scoped designation may be inserted directly:
 
 ```elanu
-create LineItem in invoice as line {
+create LineItem under invoice as line {
     insert line into otherInvoice.lines
 }
 ```
@@ -1164,7 +1164,7 @@ Elanu accepts one narrow explicit lifetime-ending operation for a committed dyna
 state selected: maybe live Document = none
 
 action permanentlyDeleteSelected {
-    destroy selected in workspace
+    destroy selected under workspace
 }
 ```
 
@@ -1222,7 +1222,7 @@ and carrier representations are not language law.
 Elanu accepts an explicit operation for permanently ending one committed dynamic lifetime subtree:
 
 ```elanu
-purge selectedFolder in trashFolder
+purge selectedFolder under trashFolder
 ```
 
 `purge` is intentionally distinct from leaf-only `destroy`. `destroy` requests termination of exactly
@@ -1270,7 +1270,7 @@ committed dynamic child without changing that child's identity:
 state selected: maybe live Document = none
 
 action moveLifetime {
-    transfer selected from leftFolder to rightFolder
+    reroot selected from leftFolder to rightFolder
 }
 ```
 
@@ -1301,13 +1301,13 @@ Current contract:
 - successful transfer commits with the surrounding action; later failure rolls the provenance
   change back with all other staged state/structural changes.
 
-`transfer` is deliberately separate from structural `move`, `insert`, and `remove`. Structural
+`reroot` is deliberately separate from structural `move`, `insert`, and `remove`. Structural
 operations do not implicitly reparent lifetime, and lifetime transfer does not infer or perform a
 structural move. This preserves the established distinction between child identity, membership,
 position, designation, lifetime/root provenance, and writable authority.
 
 Elanu currently declares no parent/child model compatibility relation beyond "this is a live
-modeled owner identity." Existing `create T in owner` establishes lifetime provenance independently
+modeled owner identity." Existing `create T under owner` establishes lifetime provenance independently
 of which `[live T]` members the owner model may contain, and `transfer` preserves that law rather
 than treating membership shape as ownership typing.
 

@@ -23,11 +23,11 @@ state observedSelected = ""
 state observedSibling = ""
 
 action seed {
-    create Document in folder as first {
+    create Document under folder as first {
         through first.title = "First"
         insert first into folder.documents
     }
-    create Document in folder as second {
+    create Document under folder as second {
         through second.title = "Second"
         insert second into folder.documents
     }
