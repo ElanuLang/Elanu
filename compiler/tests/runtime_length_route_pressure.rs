@@ -124,6 +124,152 @@ fn host_segment_loop_cannot_supply_atomic_route_semantics() {
     );
 }
 
+/// Positive control: when the route shape is statically bounded, the current
+/// language already supplies the semantic behavior an arbitrary route needs.
+///
+/// The source explicitly names two route segments, but nested actions provide:
+///
+/// - ordered application;
+/// - transaction-visible selection from the prior segment;
+/// - one shared top-level transaction;
+/// - rollback of the whole route when a later segment fails.
+///
+/// Therefore the pressure is not "Elanu cannot compose navigation atomically."
+/// It is that current action input cannot carry runtime-sized transient route
+/// structure into that already-established composition.
+#[test]
+fn bounded_source_route_already_has_required_atomic_semantics() {
+    let source = format!(
+        "{CABINET}\n{}",
+        r#"
+action replayTwo(first: Int, second: Int) {
+    selectHome()
+    selectFolder(first)
+    selectFolder(second)
+}
+"#
+    );
+
+    let checked =
+        check_source_with_runtime_models(&source).expect("bounded two-segment route should check");
+
+    let mut runtime = PartialPersistentRuntime::open(checked, MemoryProvider::default())
+        .expect("bounded-route runtime should initialize");
+
+    runtime
+        .run_action("initialize")
+        .expect("initialize should commit");
+
+    runtime
+        .run_action_with_values("createFolder", &[Value::String("Projects".into())])
+        .expect("Projects creation should commit");
+
+    runtime
+        .run_action_with_values("createFolder", &[Value::String("Elanu".into())])
+        .expect("Elanu creation should commit");
+
+    runtime
+        .run_action("selectHome")
+        .expect("Home selection should commit");
+
+    runtime
+        .run_action_with_values("replayTwo", &[Value::Int(0), Value::Int(0)])
+        .expect("bounded route should select Elanu atomically");
+
+    assert_eq!(
+        runtime.value("selectedFolderName").unwrap(),
+        Value::String("Elanu".into())
+    );
+
+    runtime
+        .run_action("selectHome")
+        .expect("Home reset should commit");
+
+    let error = runtime
+        .run_action_with_values("replayTwo", &[Value::Int(0), Value::Int(9)])
+        .expect_err("invalid second segment should fail the whole route");
+
+    assert!(
+        error.message.contains("out of bounds"),
+        "unexpected route failure: {}",
+        error.message
+    );
+
+    assert_eq!(
+        runtime.value("selectedFolderName").unwrap(),
+        Value::String("Notes".into()),
+        "failure of the later segment must roll the complete bounded route back"
+    );
+}
+
+/// The existing runtime sequence carrier is not a generic transient collection.
+///
+/// `Value::Sequence` carries modeled designation identities. The partial-runtime
+/// host boundary deliberately refuses to translate such a value into an action
+/// argument.
+///
+/// This is independent of the separate source limitation that sequence-valued
+/// action parameters are not currently supported. A future transient scalar
+/// sequence must not reuse this identity-bearing representation.
+#[test]
+fn modeled_identity_sequence_is_not_a_transient_host_value_carrier() {
+    let mut runtime = runtime();
+
+    runtime
+        .run_action("initialize")
+        .expect("initialize should commit");
+
+    let error = runtime
+        .run_action_with_values(
+            "selectFolder",
+            &[Value::Sequence {
+                element_model: "Folder".into(),
+                targets: Vec::new(),
+            }],
+        )
+        .expect_err("host values must not carry modeled identity sequences");
+
+    assert!(
+        error
+            .message
+            .contains("cannot carry modeled identity sequences"),
+        "unexpected host sequence rejection: {}",
+        error.message
+    );
+}
+
+/// Structural sequence syntax exists, but sequence values cannot currently cross
+/// an action boundary even when they are `[live T]`.
+///
+/// This is distinct from `[Int]` not being a recognized sequence type at all.
+/// The source surface recognizes `[live Folder]`, then the bootstrap sequence
+/// integration deliberately rejects it as an action parameter.
+///
+/// Therefore runtime-sized route pressure reaches a genuine structured-input
+/// boundary, not merely a missing scalar element type.
+#[test]
+fn structural_sequence_is_not_currently_an_action_parameter_surface() {
+    let source = format!(
+        "{CABINET}\n{}",
+        r#"
+action acceptFolders(route: [live Folder]) {
+}
+"#
+    );
+
+    let errors = check_source_with_runtime_models(&source)
+        .expect_err("sequence-valued action parameters should remain unsupported");
+
+    assert!(
+        errors.iter().any(|error| {
+            error
+                .message
+                .contains("does not yet support sequence action parameters")
+        }),
+        "unexpected sequence-parameter diagnostics: {errors:?}"
+    );
+}
+
 /// Probe the most obvious source representation for presentation-owned route
 /// indices.
 ///
