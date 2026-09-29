@@ -9,6 +9,10 @@ pub fn decode_sequence_value_type(name: &str) -> Option<&str> {
     name.strip_prefix(SEQUENCE_VALUE_TYPE_PREFIX)
 }
 
+pub fn encode_sequence_value_type(element_type: &str) -> String {
+    format!("{SEQUENCE_VALUE_TYPE_PREFIX}{element_type}")
+}
+
 pub fn decode_sequence_live_type(name: &str) -> Option<&str> {
     name.strip_prefix(SEQUENCE_LIVE_TYPE_PREFIX)
 }
@@ -100,7 +104,7 @@ pub fn preprocess(source: &str) -> Result<String, Vec<Diagnostic>> {
                 format!("[{inner}]")
             } else {
                 errors.push(Diagnostic::new(
-                    "bootstrap ordered-sequence literals currently contain only 'live <state-binding>' elements",
+                    "bootstrap ordered-sequence types currently require a primitive element type or '[live <StateModel>]'",
                     start_line,
                     start_column,
                 ));

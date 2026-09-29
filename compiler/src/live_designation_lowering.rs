@@ -1808,6 +1808,9 @@ fn runtime_value_type_name(value_type: &ValueType) -> String {
         ValueType::Float => "Float".to_string(),
         ValueType::Bool => "Bool".to_string(),
         ValueType::String => "String".to_string(),
+        ValueType::Sequence(element) => crate::sequence_surface::encode_sequence_value_type(
+            &crate::semantic::show_type(element),
+        ),
         ValueType::SequenceLive(model) => {
             crate::runtime_sequence_markers::encode_runtime_sequence_type(model)
         }
