@@ -24,25 +24,25 @@ state observedChildName = ""
 state observedGrandchildName = ""
 
 action seed {
-    create Node in left as rootNode {
+    create Node under left as rootNode {
         through rootNode.name = "Root"
         insert rootNode into left.children
     }
     root = left.children[0]
 
-    create Node in right as foreignNode {
+    create Node under right as foreignNode {
         through foreignNode.name = "Foreign"
         insert foreignNode into right.children
     }
     foreign = right.children[0]
 
-    create Node in root as childNode {
+    create Node under root as childNode {
         through childNode.name = "Child"
         insert childNode into root.children
     }
     child = root.children[0]
 
-    create Node in child as grandchildNode {
+    create Node under child as grandchildNode {
         through grandchildNode.name = "Grandchild"
         insert grandchildNode into child.children
     }
@@ -50,20 +50,20 @@ action seed {
 }
 
 action transferOutThenPurge {
-    transfer child from root to foreign
-    purge root in left
+    reroot child from root to foreign
+    purge root under left
 }
 
 action proveForeignOwnsChild {
-    transfer child from foreign to foreign
+    reroot child from foreign to foreign
 }
 
 action proveChildOwnsGrandchild {
-    transfer grandchild from child to child
+    reroot grandchild from child to child
 }
 
 action proveLeftOwnsRoot {
-    transfer root from left to left
+    reroot root from left to left
 }
 
 action readChildName {

@@ -904,7 +904,7 @@ state selected: maybe live Folder = none
 derived selectedName = selected.name
 
 action createFolder {
-    create Folder in workspace as folder {
+    create Folder under workspace as folder {
         through folder.name = "Project"
         insert folder into workspace.folders
     }

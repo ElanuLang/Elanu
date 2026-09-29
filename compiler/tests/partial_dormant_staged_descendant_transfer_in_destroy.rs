@@ -32,24 +32,24 @@ state observedName = ""
 state observedTitle = ""
 
 action seed {
-    create Folder in workspace as source {
+    create Folder under workspace as source {
         through source.name = "Source"
         insert source into workspace.folders
     }
-    create Folder in workspace as destination {
+    create Folder under workspace as destination {
         through destination.name = "Destination"
         insert destination into workspace.folders
     }
     sourceFolder = workspace.folders[0]
     destinationFolder = workspace.folders[1]
 
-    create Folder in sourceFolder as child {
+    create Folder under sourceFolder as child {
         through child.name = "Child"
         insert child into sourceFolder.folders
     }
     selectedChild = sourceFolder.folders[0]
 
-    create Document in destinationFolder as document {
+    create Document under destinationFolder as document {
         through document.title = "External descendant"
         insert document into destinationFolder.documents
     }
@@ -57,16 +57,16 @@ action seed {
 }
 
 action transferInThenDestroy {
-    transfer selectedDocument from destinationFolder to selectedChild
-    destroy selectedChild in sourceFolder
+    reroot selectedDocument from destinationFolder to selectedChild
+    destroy selectedChild under sourceFolder
 }
 
 action proveSourceOwnsChild {
-    transfer selectedChild from sourceFolder to sourceFolder
+    reroot selectedChild from sourceFolder to sourceFolder
 }
 
 action proveDestinationOwnsDocument {
-    transfer selectedDocument from destinationFolder to destinationFolder
+    reroot selectedDocument from destinationFolder to destinationFolder
 }
 
 action readChildName {

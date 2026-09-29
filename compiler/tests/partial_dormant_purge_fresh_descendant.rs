@@ -18,21 +18,21 @@ state root: maybe live Node = none
 state observedName = ""
 
 action seed {
-    create Node in left as rootNode {
+    create Node under left as rootNode {
         through rootNode.name = "Committed root"
         root = rootNode
     }
 }
 
 action createFreshThenPurge {
-    create Node in root as freshNode {
+    create Node under root as freshNode {
         through freshNode.name = "Fresh"
     }
-    purge root in left
+    purge root under left
 }
 
 action proveLeftOwnsRoot {
-    transfer root from left to left
+    reroot root from left to left
 }
 
 action readRootName {

@@ -28,11 +28,11 @@ derived selectedInTrash = selectedFolder is in trashFolder.folders
 derived descendantInSelected = descendantFolder is in selectedFolder.folders
 
 action seed {
-    create Folder in workspace as source {
+    create Folder under workspace as source {
         through source.name = "Source"
         insert source into workspace.folders
     }
-    create Folder in workspace as trash {
+    create Folder under workspace as trash {
         through trash.name = "Trash"
         insert trash into workspace.folders
     }
@@ -40,7 +40,7 @@ action seed {
     sourceFolder = workspace.folders[0]
     trashFolder = workspace.folders[1]
 
-    create Folder in sourceFolder as selected {
+    create Folder under sourceFolder as selected {
         through selected.name = "Selected"
         insert selected into sourceFolder.folders
     }
@@ -49,7 +49,7 @@ action seed {
 }
 
 action addDescendant {
-    create Folder in selectedFolder as descendant {
+    create Folder under selectedFolder as descendant {
         through descendant.name = "Descendant"
         insert descendant into selectedFolder.folders
     }
@@ -57,25 +57,25 @@ action addDescendant {
 }
 
 action moveToTrash {
-    transfer selectedFolder from sourceFolder to trashFolder
+    reroot selectedFolder from sourceFolder to trashFolder
     insert selectedFolder into trashFolder.folders
     remove selectedFolder from sourceFolder.folders
 }
 
 action restoreFromTrash {
     restoreDestination = selectedFolder.restoreParent
-    transfer selectedFolder from trashFolder to restoreDestination
+    reroot selectedFolder from trashFolder to restoreDestination
     insert selectedFolder into restoreDestination.folders
     remove selectedFolder from trashFolder.folders
     through selectedFolder.restoreParent = none
 }
 
 action proveSelectedOwner {
-    transfer selectedFolder from sourceFolder to sourceFolder
+    reroot selectedFolder from sourceFolder to sourceFolder
 }
 
 action proveDescendantOwner {
-    transfer descendantFolder from selectedFolder to selectedFolder
+    reroot descendantFolder from selectedFolder to selectedFolder
 }
 
 action observeDescendant {

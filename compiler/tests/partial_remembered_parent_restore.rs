@@ -27,11 +27,11 @@ derived inTrash = selectedFolder is in trashFolder.folders
 derived restoreDestinationPresent = restoreDestination is present
 
 action seed {
-    create Folder in workspace as source {
+    create Folder under workspace as source {
         through source.name = "Source"
         insert source into workspace.folders
     }
-    create Folder in workspace as trash {
+    create Folder under workspace as trash {
         through trash.name = "Trash"
         insert trash into workspace.folders
     }
@@ -39,14 +39,14 @@ action seed {
     sourceFolder = workspace.folders[0]
     trashFolder = workspace.folders[1]
 
-    create Folder in sourceFolder as selected {
+    create Folder under sourceFolder as selected {
         through selected.name = "Selected"
         insert selected into sourceFolder.folders
     }
     selectedFolder = sourceFolder.folders[0]
     through selectedFolder.restoreParent = sourceFolder
 
-    create Folder in sourceFolder as doomed {
+    create Folder under sourceFolder as doomed {
         through doomed.name = "Doomed"
         insert doomed into sourceFolder.folders
     }
@@ -54,19 +54,19 @@ action seed {
 }
 
 action moveToTrash {
-    transfer selectedFolder from sourceFolder to trashFolder
+    reroot selectedFolder from sourceFolder to trashFolder
     insert selectedFolder into trashFolder.folders
     remove selectedFolder from sourceFolder.folders
 }
 
 action restoreFromTrash {
     restoreDestination = selectedFolder.restoreParent
-    transfer selectedFolder from trashFolder to restoreDestination
+    reroot selectedFolder from trashFolder to restoreDestination
     insert selectedFolder into restoreDestination.folders
     if not selectedFolder is in restoreDestination.folders {
         fail "restored membership was not transaction-visible"
     }
-    destroy doomedFolder in sourceFolder
+    destroy doomedFolder under sourceFolder
     remove selectedFolder from trashFolder.folders
     through selectedFolder.restoreParent = none
 }
@@ -76,7 +76,7 @@ action inspectRememberedParent {
 }
 
 action proveRestoredOwner {
-    transfer selectedFolder from sourceFolder to sourceFolder
+    reroot selectedFolder from sourceFolder to sourceFolder
 }
 "#;
 

@@ -31,19 +31,19 @@ state observedName = ""
 state observedTitle = ""
 
 action seed {
-    create Folder in workspace as source {
+    create Folder under workspace as source {
         through source.name = "Source"
         insert source into workspace.folders
     }
     sourceFolder = workspace.folders[0]
 
-    create Folder in sourceFolder as child {
+    create Folder under sourceFolder as child {
         through child.name = "Child"
         insert child into sourceFolder.folders
     }
     selectedChild = sourceFolder.folders[0]
 
-    create Document in selectedChild as document {
+    create Document under selectedChild as document {
         through document.title = "Descendant"
         insert document into selectedChild.documents
     }
@@ -51,15 +51,15 @@ action seed {
 }
 
 action destroyChild {
-    destroy selectedChild in sourceFolder
+    destroy selectedChild under sourceFolder
 }
 
 action proveSourceStillOwnsChild {
-    transfer selectedChild from sourceFolder to sourceFolder
+    reroot selectedChild from sourceFolder to sourceFolder
 }
 
 action proveChildStillOwnsDocument {
-    transfer selectedDocument from selectedChild to selectedChild
+    reroot selectedDocument from selectedChild to selectedChild
 }
 
 action readChildName {
@@ -94,24 +94,24 @@ state selectedDocument: maybe live Document = none
 state observedTitle = ""
 
 action seed {
-    create Folder in workspace as source {
+    create Folder under workspace as source {
         through source.name = "Source"
         insert source into workspace.folders
     }
-    create Folder in workspace as destination {
+    create Folder under workspace as destination {
         through destination.name = "Destination"
         insert destination into workspace.folders
     }
     sourceFolder = workspace.folders[0]
     destinationFolder = workspace.folders[1]
 
-    create Folder in sourceFolder as child {
+    create Folder under sourceFolder as child {
         through child.name = "Child"
         insert child into sourceFolder.folders
     }
     selectedChild = sourceFolder.folders[0]
 
-    create Document in selectedChild as document {
+    create Document under selectedChild as document {
         through document.title = "Transferred descendant"
         insert document into selectedChild.documents
     }
@@ -119,16 +119,16 @@ action seed {
 }
 
 action transferOutThenDestroy {
-    transfer selectedDocument from selectedChild to destinationFolder
-    destroy selectedChild in sourceFolder
+    reroot selectedDocument from selectedChild to destinationFolder
+    destroy selectedChild under sourceFolder
 }
 
 action proveDestinationOwnsDocument {
-    transfer selectedDocument from destinationFolder to destinationFolder
+    reroot selectedDocument from destinationFolder to destinationFolder
 }
 
 action proveSourceOwnsChild {
-    transfer selectedChild from sourceFolder to sourceFolder
+    reroot selectedChild from sourceFolder to sourceFolder
 }
 
 action selectSourceChild {

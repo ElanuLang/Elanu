@@ -23,25 +23,25 @@ state foreign: maybe live Node = none
 state observedName = ""
 
 action seed {
-    create Node in left as rootNode {
+    create Node under left as rootNode {
         through rootNode.name = "Root"
         insert rootNode into left.children
     }
     root = left.children[0]
 
-    create Node in right as foreignNode {
+    create Node under right as foreignNode {
         through foreignNode.name = "Foreign survivor"
         insert foreignNode into right.children
     }
     foreign = right.children[0]
 
-    create Node in foreign as childNode {
+    create Node under foreign as childNode {
         through childNode.name = "Child"
         insert childNode into foreign.children
     }
     child = foreign.children[0]
 
-    create Node in child as grandchildNode {
+    create Node under child as grandchildNode {
         through grandchildNode.name = "Grandchild"
         insert grandchildNode into child.children
     }
@@ -49,20 +49,20 @@ action seed {
 }
 
 action transferInThenPurge {
-    transfer child from foreign to root
-    purge root in left
+    reroot child from foreign to root
+    purge root under left
 }
 
 action proveRightOwnsForeign {
-    transfer foreign from right to right
+    reroot foreign from right to right
 }
 
 action proveLeftOwnsRoot {
-    transfer root from left to left
+    reroot root from left to left
 }
 
 action proveForeignOwnsChild {
-    transfer child from foreign to foreign
+    reroot child from foreign to foreign
 }
 
 action selectForeignChild {

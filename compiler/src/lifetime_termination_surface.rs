@@ -12,7 +12,7 @@ pub const PURGE_BUILTIN_ACTION: &str = "__elanu_surface_purge_subtree_builtin";
 
 /// Preprocess the intentionally narrow rooted-child lifetime surface:
 ///
-/// `destroy selected in workspace`
+/// `destroy selected under workspace`
 ///
 /// The source designation remains an ordinary persistent designation name until
 /// live-designation lowering converts it to its private identity carrier. The
@@ -278,10 +278,10 @@ fn parse_purge_statement(source: &str, start: usize) -> Option<(usize, String, S
 
     let (designation, next) = parse_identifier(source, index)?;
     index = skip_inline_whitespace(source, next);
-    if !keyword_at(source, index, "in") {
+    if !keyword_at(source, index, "under") {
         return None;
     }
-    index += "in".len();
+    index += "under".len();
     index = skip_inline_whitespace(source, index);
 
     let (owner, next) = parse_name_path(source, index)?;
@@ -300,10 +300,10 @@ fn parse_destroy_statement(source: &str, start: usize) -> Option<(usize, String,
 
     let (designation, next) = parse_identifier(source, index)?;
     index = skip_inline_whitespace(source, next);
-    if !keyword_at(source, index, "in") {
+    if !keyword_at(source, index, "under") {
         return None;
     }
-    index += "in".len();
+    index += "under".len();
     index = skip_inline_whitespace(source, index);
 
     let (owner, next) = parse_name_path(source, index)?;

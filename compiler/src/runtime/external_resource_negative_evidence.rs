@@ -106,7 +106,7 @@ state selected: maybe live Document = none
 derived selectedTitle = selected.title
 
 action seed {
-    create Document in workspace as document {
+    create Document under workspace as document {
         through document.title = "Draft"
         insert document into workspace.documents
     }

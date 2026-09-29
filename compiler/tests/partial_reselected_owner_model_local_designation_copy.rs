@@ -25,19 +25,19 @@ state restoreDestination: maybe live Folder = none
 state observedDestinationName = ""
 
 action seed {
-    create Folder in workspace as ownerA {
+    create Folder under workspace as ownerA {
         through ownerA.name = "OwnerA"
         insert ownerA into workspace.folders
     }
-    create Folder in workspace as ownerB {
+    create Folder under workspace as ownerB {
         through ownerB.name = "OwnerB"
         insert ownerB into workspace.folders
     }
-    create Folder in workspace as targetA {
+    create Folder under workspace as targetA {
         through targetA.name = "TargetA"
         insert targetA into workspace.folders
     }
-    create Folder in workspace as targetB {
+    create Folder under workspace as targetB {
         through targetB.name = "TargetB"
         insert targetB into workspace.folders
     }

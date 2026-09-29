@@ -232,11 +232,11 @@ derived selectedName = selectedFolder.name
 derived firstDocumentTitle = selectedFolder.documents[0].title
 
 action seed {
-    create Folder in workspace as source {
+    create Folder under workspace as source {
         through source.name = "Source"
         insert source into workspace.folders
     }
-    create Folder in workspace as trash {
+    create Folder under workspace as trash {
         through trash.name = "Trash"
         insert trash into workspace.folders
     }
@@ -244,13 +244,13 @@ action seed {
     sourceFolder = workspace.folders[0]
     trashFolder = workspace.folders[1]
 
-    create Folder in sourceFolder as folder {
+    create Folder under sourceFolder as folder {
         through folder.name = "Project"
         insert folder into sourceFolder.folders
     }
     selectedFolder = sourceFolder.folders[0]
 
-    create Document in selectedFolder as document {
+    create Document under selectedFolder as document {
         through document.title = "Draft"
         insert document into selectedFolder.documents
     }
@@ -258,7 +258,7 @@ action seed {
 
 action moveToTrash {
     through selectedFolder.restoreParent = sourceFolder
-    transfer selectedFolder from sourceFolder to trashFolder
+    reroot selectedFolder from sourceFolder to trashFolder
     insert selectedFolder into trashFolder.folders
     remove selectedFolder from sourceFolder.folders
 }
@@ -270,22 +270,22 @@ action failedRename {
 
 action restoreFromTrash {
     restoreDestination = selectedFolder.restoreParent
-    transfer selectedFolder from trashFolder to restoreDestination
+    reroot selectedFolder from trashFolder to restoreDestination
     insert selectedFolder into restoreDestination.folders
     remove selectedFolder from trashFolder.folders
     through selectedFolder.restoreParent = none
 }
 
 action staleOwnerProof {
-    transfer selectedFolder from trashFolder to trashFolder
+    reroot selectedFolder from trashFolder to trashFolder
 }
 
 action currentOwnerProof {
-    transfer selectedFolder from sourceFolder to sourceFolder
+    reroot selectedFolder from sourceFolder to sourceFolder
 }
 
 action createAnotherFolder {
-    create Folder in workspace as another {
+    create Folder under workspace as another {
         through another.name = "Another"
         insert another into workspace.folders
     }

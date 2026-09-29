@@ -46,14 +46,14 @@ derived selectedNoteInTrash = selectedNote is in trashFolder.notes
 
 action initialize {
     if not initialized {
-        create Folder in workspace as home {
+        create Folder under workspace as home {
             through home.name = "Notes"
             insert home into workspace.folders
             homeFolder = home
             selectedFolder = home
         }
 
-        create Folder in workspace as trash {
+        create Folder under workspace as trash {
             through trash.name = "Trash"
             insert trash into workspace.folders
             trashFolder = trash
@@ -79,7 +79,7 @@ action selectFolder(index: Int) {
 }
 
 action createFolder(name: String) {
-    create Folder in selectedFolder as folder {
+    create Folder under selectedFolder as folder {
         insert folder into selectedFolder.folders
         selectedFolder = folder
         selectedNote = none
@@ -96,7 +96,7 @@ action selectNote(index: Int) {
 }
 
 action createNote(title: String, body: String) {
-    create Note in selectedFolder as note {
+    create Note under selectedFolder as note {
         insert note into selectedFolder.notes
         selectedNote = note
     }
@@ -112,14 +112,14 @@ action editSelectedNote(title: String, body: String) {
 action trashSelectedNote {
     through selectedNote.restoreParent = selectedFolder
     restoreFolder = selectedNote.restoreParent
-    transfer selectedNote from selectedFolder to trashFolder
+    reroot selectedNote from selectedFolder to trashFolder
     insert selectedNote into trashFolder.notes
     remove selectedNote from selectedFolder.notes
 }
 
 action restoreSelectedNote {
     restoreFolder = selectedNote.restoreParent
-    transfer selectedNote from trashFolder to restoreFolder
+    reroot selectedNote from trashFolder to restoreFolder
     insert selectedNote into restoreFolder.notes
     remove selectedNote from trashFolder.notes
     through selectedNote.restoreParent = none
@@ -128,7 +128,7 @@ action restoreSelectedNote {
 
 action permanentlyDeleteSelectedNote {
     remove selectedNote from trashFolder.notes
-    destroy selectedNote in trashFolder
+    destroy selectedNote under trashFolder
 }
 
 action failEditSelectedNote(title: String) {

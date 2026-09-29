@@ -22,17 +22,17 @@ derived inSource = selectedFolder is in sourceFolder.folders
 derived inTrash = selectedFolder is in trashFolder.folders
 
 action seed {
-    create Folder in workspace as source {
+    create Folder under workspace as source {
         insert source into workspace.folders
     }
-    create Folder in workspace as trash {
+    create Folder under workspace as trash {
         insert trash into workspace.folders
     }
 
     sourceFolder = workspace.folders[0]
     trashFolder = workspace.folders[1]
 
-    create Folder in sourceFolder as selected {
+    create Folder under sourceFolder as selected {
         insert selected into sourceFolder.folders
     }
     selectedFolder = sourceFolder.folders[0]
@@ -41,7 +41,7 @@ action seed {
 action moveToTrash {
     through selectedFolder.restoreParent = sourceFolder
     restoreDestination = selectedFolder.restoreParent
-    transfer selectedFolder from sourceFolder to trashFolder
+    reroot selectedFolder from sourceFolder to trashFolder
     insert selectedFolder into trashFolder.folders
     remove selectedFolder from sourceFolder.folders
 }
@@ -52,7 +52,7 @@ action inspectRememberedParent {
 
 action restoreFromTrash {
     restoreDestination = selectedFolder.restoreParent
-    transfer selectedFolder from trashFolder to restoreDestination
+    reroot selectedFolder from trashFolder to restoreDestination
     insert selectedFolder into restoreDestination.folders
     remove selectedFolder from trashFolder.folders
     through selectedFolder.restoreParent = none
@@ -60,7 +60,7 @@ action restoreFromTrash {
 
 action restoreFromTrashThenFail {
     restoreDestination = selectedFolder.restoreParent
-    transfer selectedFolder from trashFolder to restoreDestination
+    reroot selectedFolder from trashFolder to restoreDestination
     insert selectedFolder into restoreDestination.folders
     remove selectedFolder from trashFolder.folders
     through selectedFolder.restoreParent = none
@@ -68,11 +68,11 @@ action restoreFromTrashThenFail {
 }
 
 action destroyRememberedSource {
-    destroy sourceFolder in workspace
+    destroy sourceFolder under workspace
 }
 
 action proveRestoredOwner {
-    transfer selectedFolder from sourceFolder to sourceFolder
+    reroot selectedFolder from sourceFolder to sourceFolder
 }
 "#;
 

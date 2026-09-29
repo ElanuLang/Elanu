@@ -24,7 +24,7 @@ state selected: maybe live Document = none
 state pinned: live Document = live initialDocument
 
 action createAndSelect {
-    create Document in workspace as document {
+    create Document under workspace as document {
         through document.title = "New"
         insert document into workspace.documents
         selected = document
@@ -33,7 +33,7 @@ action createAndSelect {
 }
 
 action createSelectThenFail {
-    create Document in workspace as document {
+    create Document under workspace as document {
         insert document into workspace.documents
         selected = document
         fail "rollback"
@@ -101,7 +101,7 @@ state workspace: Workspace
 state selectedProject: maybe live Project = none
 
 action attempt {
-    create Document in workspace as document {
+    create Document under workspace as document {
         selectedProject = document
     }
 }
@@ -125,7 +125,7 @@ state workspace: Workspace
 state leaked = ""
 
 action attempt {
-    create Document in workspace as document {
+    create Document under workspace as document {
         leaked = document
     }
 }

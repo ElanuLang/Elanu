@@ -25,23 +25,23 @@ state thirdDocument: maybe live Document = none
 derived selectedTitle = selectedDocument.title
 
 action seed {
-    create Folder in workspace as folder {
+    create Folder under workspace as folder {
         insert folder into workspace.folders
     }
     selectedFolder = workspace.folders[0]
-    create Folder in workspace as other {
+    create Folder under workspace as other {
         insert other into workspace.folders
         otherFolder = other
     }
-    create Document in selectedFolder as first {
+    create Document under selectedFolder as first {
         through first.title = "First"
         insert first into selectedFolder.documents
     }
-    create Document in selectedFolder as second {
+    create Document under selectedFolder as second {
         through second.title = "Second"
         insert second into selectedFolder.documents
     }
-    create Document in selectedFolder as third {
+    create Document under selectedFolder as third {
         through third.title = "Third"
         insert third into selectedFolder.documents
     }

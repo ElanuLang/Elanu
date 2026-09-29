@@ -22,7 +22,7 @@ const GENERATED_SCOPE_IDENTITY_PREFIX: &str = "__elanu_create_scope_identity_";
 
 /// Experimental surface transport for:
 ///
-/// `create T in owner as name { ... }`
+/// `create T under owner as name { ... }`
 ///
 /// The temporary `if true` carrier is consumed by `lower_scopes` before
 /// ordinary semantic checking. It is bootstrap representation, not source law.
@@ -1175,10 +1175,10 @@ fn parse_create_head(source: &str, start: usize) -> Option<(usize, String, Strin
     index = skip_inline_whitespace(source, index);
     let (model, next) = parse_identifier(source, index)?;
     index = skip_inline_whitespace(source, next);
-    if !keyword_at(source, index, "in") {
+    if !keyword_at(source, index, "under") {
         return None;
     }
-    index += "in".len();
+    index += "under".len();
     index = skip_inline_whitespace(source, index);
     let (owner, next) = parse_name_path(source, index)?;
     Some((next, model, owner))
@@ -1271,7 +1271,7 @@ mod tests {
     #[test]
     fn preprocesses_scoped_create_to_private_carrier() {
         let source = r#"action add {
-    create LineItem in invoice as line {
+    create LineItem under invoice as line {
         through line.quantity = 3
     }
 }
@@ -1297,7 +1297,7 @@ state model Invoice {
 state invoice: Invoice
 
 action add {
-    create LineItem in invoice as line {
+    create LineItem under invoice as line {
         through line.quantity = 3
         if line.lineTotal > 10.0 {
             through line.quantity += 1
@@ -1320,7 +1320,7 @@ state model Invoice {
 state invoice: Invoice
 
 action add {
-    create LineItem in invoice as line {
+    create LineItem under invoice as line {
         line.quantity = 3
     }
 }

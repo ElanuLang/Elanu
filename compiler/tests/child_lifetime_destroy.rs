@@ -3,7 +3,7 @@ use elanu_compiler::{
     runtime::{Runtime, Value},
 };
 
-// Source-contract regression: `destroy designation in owner` ends rooted child lifetime;
+// Source-contract regression: `destroy designation under owner` ends rooted child lifetime;
 // it is not structural removal and does not make designation or membership owning.
 // Root provenance is the lifetime-authority fact; foreign membership is not authority.
 const SOURCE: &str = r#"
@@ -22,7 +22,7 @@ state selected: maybe live Task = none
 state recent: maybe live Task = none
 
 action seed {
-    create Task in left as task {
+    create Task under left as task {
         through task.title = "Draft"
         insert task into left.tasks
         insert task into right.tasks
@@ -34,28 +34,28 @@ action seed {
 }
 
 action permanentDelete {
-    destroy selected in left
+    destroy selected under left
 }
 
 action destroyThenFail {
-    destroy selected in left
+    destroy selected under left
     fail "later"
 }
 
 action foreignDestroy {
-    destroy selected in right
+    destroy selected under right
 }
 
 action destroyAbsent {
-    destroy selected in left
+    destroy selected under left
 }
 
 action createThenDestroy {
-    create Task in left as task {
+    create Task under left as task {
         insert task into left.tasks
     }
     selected = left.tasks[0]
-    destroy selected in left
+    destroy selected under left
 }
 "#;
 
@@ -181,7 +181,7 @@ state board: Board
 state selected: live Task = live fallback
 
 action attempt {
-    destroy selected in board
+    destroy selected under board
 }
 "#;
 
@@ -199,7 +199,7 @@ state model Task { state title = "" }
 state selected: maybe live Task = none
 
 action attempt {
-    destroy selected in nowhere
+    destroy selected under nowhere
 }
 "#;
 

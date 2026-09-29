@@ -25,26 +25,26 @@ state pinned: live Node = live fallback
 state observedName = ""
 
 action seed {
-    create Node in right as foreignNode {
+    create Node under right as foreignNode {
         through foreignNode.name = "Foreign survivor"
         insert foreignNode into right.children
     }
     foreign = right.children[0]
     pinned = right.children[0]
 
-    create Node in left as rootNode {
+    create Node under left as rootNode {
         through rootNode.name = "Root"
         insert rootNode into left.children
     }
     root = left.children[0]
 
-    create Node in root as childNode {
+    create Node under root as childNode {
         through childNode.name = "Child"
         insert childNode into root.children
     }
     child = root.children[0]
 
-    create Node in child as grandchildNode {
+    create Node under child as grandchildNode {
         through grandchildNode.name = "Grandchild"
         insert grandchildNode into child.children
         insert grandchildNode into right.children
@@ -54,19 +54,19 @@ action seed {
 
 action reselectInThenPurge {
     pinned = right.children[1]
-    purge root in left
+    purge root under left
 }
 
 action proveLeftOwnsRoot {
-    transfer root from left to left
+    reroot root from left to left
 }
 
 action proveRootOwnsChild {
-    transfer child from root to root
+    reroot child from root to root
 }
 
 action proveChildOwnsGrandchild {
-    transfer grandchild from child to child
+    reroot grandchild from child to child
 }
 
 action readPinnedName {

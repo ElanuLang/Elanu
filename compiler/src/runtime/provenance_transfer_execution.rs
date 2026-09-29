@@ -51,7 +51,7 @@ state right: Folder
 state selected: maybe live Document = none
 
 action seed {
-    create Document in left as document {
+    create Document under left as document {
         through document.title = "Draft"
         insert document into left.documents
         insert document into right.documents

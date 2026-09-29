@@ -24,13 +24,13 @@ derived inSource = selectedFolder is in sourceFolder.folders
 derived inDestination = selectedFolder is in destinationFolder.folders
 
 action seed {
-    create Folder in workspace as left {
+    create Folder under workspace as left {
         insert left into workspace.folders
     }
-    create Folder in workspace as right {
+    create Folder under workspace as right {
         insert right into workspace.folders
     }
-    create Folder in workspace as nested {
+    create Folder under workspace as nested {
         insert nested into workspace.folders
     }
 
@@ -101,43 +101,43 @@ derived inTrash = selectedFolder is in trashFolder.folders
 derived descendantStillNested = descendantFolder is in selectedFolder.folders
 
 action seedTrashCase {
-    create Folder in workspace as source {
+    create Folder under workspace as source {
         insert source into workspace.folders
     }
-    create Folder in workspace as trash {
+    create Folder under workspace as trash {
         insert trash into workspace.folders
     }
 
     sourceFolder = workspace.folders[0]
     trashFolder = workspace.folders[1]
 
-    create Folder in sourceFolder as selected {
+    create Folder under sourceFolder as selected {
         insert selected into sourceFolder.folders
     }
     selectedFolder = sourceFolder.folders[0]
 
-    create Folder in selectedFolder as descendant {
+    create Folder under selectedFolder as descendant {
         insert descendant into selectedFolder.folders
     }
     descendantFolder = selectedFolder.folders[0]
 }
 
 action moveTreeToTrash {
-    transfer selectedFolder from sourceFolder to trashFolder
+    reroot selectedFolder from sourceFolder to trashFolder
     insert selectedFolder into trashFolder.folders
     remove selectedFolder from sourceFolder.folders
 }
 
 action proveMovedFolderOwner {
-    transfer selectedFolder from trashFolder to trashFolder
+    reroot selectedFolder from trashFolder to trashFolder
 }
 
 action proveDescendantOwner {
-    transfer descendantFolder from selectedFolder to selectedFolder
+    reroot descendantFolder from selectedFolder to selectedFolder
 }
 
 action moveTreeToTrashThenFail {
-    transfer selectedFolder from sourceFolder to trashFolder
+    reroot selectedFolder from sourceFolder to trashFolder
     insert selectedFolder into trashFolder.folders
     remove selectedFolder from sourceFolder.folders
     fail "abort"

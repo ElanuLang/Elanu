@@ -51,17 +51,17 @@ derived positionCode = workstation.selectedPositionCode
 
 // Unique-key setup: [A, B, C], with B selected.
 action setupUnique {
-    create Task in workstation as a {
+    create Task under workstation as a {
         through a.key = "A"
         through a.title = "A"
         insert a into workstation.tasks
     }
-    create Task in workstation as b {
+    create Task under workstation as b {
         through b.key = "B"
         through b.title = "B"
         insert b into workstation.tasks
     }
-    create Task in workstation as c {
+    create Task under workstation as c {
         through c.key = "C"
         through c.title = "C"
         insert c into workstation.tasks
@@ -101,22 +101,22 @@ action mutateSelectedBusinessKey {
 // Duplicate business keys: [A(same), B, C(same), D], with C selected.
 // Key-based reconstruction finds A, not the designated C.
 action setupDuplicateBusinessKeys {
-    create Task in workstation as a {
+    create Task under workstation as a {
         through a.key = "same"
         through a.title = "A"
         insert a into workstation.tasks
     }
-    create Task in workstation as b {
+    create Task under workstation as b {
         through b.key = "B"
         through b.title = "B"
         insert b into workstation.tasks
     }
-    create Task in workstation as c {
+    create Task under workstation as c {
         through c.key = "same"
         through c.title = "C"
         insert c into workstation.tasks
     }
-    create Task in workstation as d {
+    create Task under workstation as d {
         through d.key = "D"
         through d.title = "D"
         insert d into workstation.tasks
@@ -129,18 +129,18 @@ action setupDuplicateBusinessKeys {
 // only the child identity C. The stored designation does not retain which occurrence
 // supplied it.
 action setupDuplicateChildAndSelectFirstOccurrence {
-    create Task in workstation as a {
+    create Task under workstation as a {
         through a.key = "A"
         through a.title = "A"
         insert a into workstation.tasks
     }
-    create Task in workstation as c {
+    create Task under workstation as c {
         through c.key = "C"
         through c.title = "C"
         insert c into workstation.tasks
         insert c into workstation.tasks
     }
-    create Task in workstation as d {
+    create Task under workstation as d {
         through d.key = "D"
         through d.title = "D"
         insert d into workstation.tasks
@@ -150,18 +150,18 @@ action setupDuplicateChildAndSelectFirstOccurrence {
 }
 
 action setupDuplicateChildAndSelectSecondOccurrence {
-    create Task in workstation as a {
+    create Task under workstation as a {
         through a.key = "A"
         through a.title = "A"
         insert a into workstation.tasks
     }
-    create Task in workstation as c {
+    create Task under workstation as c {
         through c.key = "C"
         through c.title = "C"
         insert c into workstation.tasks
         insert c into workstation.tasks
     }
-    create Task in workstation as d {
+    create Task under workstation as d {
         through d.key = "D"
         through d.title = "D"
         insert d into workstation.tasks
