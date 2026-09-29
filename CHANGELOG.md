@@ -66,7 +66,6 @@ Elanu v0.9.0 promotes the post-v0.8.0 workstation composition work into the curr
 
 ### Language and semantics
 
-- Clarified lifetime/rooting source vocabulary without changing semantics: `create ... under ...`, `reroot ... from ... to ...`, `destroy ... under ...`, and `purge ... under ...` now distinguish provenance operations from structural `insert ... into ...` / `remove ... from ...`.
 
 - Renamed the language to **Elanu**, the compiler/package/binary to `elanu`, and adopted `.elnu` as the canonical source-file extension convention without changing established semantics.
 - Added owner-relative dynamic modeled-state child creation and scoped creation/insertion while preserving transaction-local fresh identity.
@@ -102,7 +101,6 @@ Meld v0.8.0 promotes the post-v0.7.1 composition work into the current language 
 
 ### Language and semantics
 
-- Clarified lifetime/rooting source vocabulary without changing semantics: `create ... under ...`, `reroot ... from ... to ...`, `destroy ... under ...`, and `purge ... under ...` now distinguish provenance operations from structural `insert ... into ...` / `remove ... from ...`.
 
 - Added `state model` reusable modeled-state shapes with distinct live constituent identities.
 - Added `live T` non-owning designations.
