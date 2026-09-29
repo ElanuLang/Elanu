@@ -1,8 +1,13 @@
 use crate::diagnostic::Diagnostic;
 
+pub const SEQUENCE_VALUE_TYPE_PREFIX: &str = "__elanu_sequence_value_type_";
 pub const SEQUENCE_LIVE_TYPE_PREFIX: &str = "__elanu_sequence_live_type_";
 pub const SEQUENCE_LITERAL_PREFIX: &str = "__elanu_sequence_literal$";
 pub const SEQUENCE_INDEX_SEGMENT_PREFIX: &str = "__elanu_sequence_index_";
+
+pub fn decode_sequence_value_type(name: &str) -> Option<&str> {
+    name.strip_prefix(SEQUENCE_VALUE_TYPE_PREFIX)
+}
 
 pub fn decode_sequence_live_type(name: &str) -> Option<&str> {
     name.strip_prefix(SEQUENCE_LIVE_TYPE_PREFIX)
@@ -73,16 +78,17 @@ pub fn preprocess(source: &str) -> Result<String, Vec<Diagnostic>> {
             {
                 format!(".{SEQUENCE_INDEX_SEGMENT_PREFIX}{trimmed}")
             } else if last_significant == Some(':') {
-                match parse_live_element(trimmed) {
-                    Some(model) => format!("{SEQUENCE_LIVE_TYPE_PREFIX}{model}"),
-                    None => {
-                        errors.push(Diagnostic::new(
-                            "bootstrap ordered-sequence types currently require '[live <StateModel>]'",
-                            start_line,
-                            start_column,
-                        ));
-                        String::new()
-                    }
+                if let Some(model) = parse_live_element(trimmed) {
+                    format!("{SEQUENCE_LIVE_TYPE_PREFIX}{model}")
+                } else if let Some(element_type) = parse_value_element_type(trimmed) {
+                    format!("{SEQUENCE_VALUE_TYPE_PREFIX}{element_type}")
+                } else {
+                    errors.push(Diagnostic::new(
+            "bootstrap ordered-sequence types currently require a primitive element type or '[live <StateModel>]'",
+            start_line,
+            start_column,
+        ));
+                    String::new()
                 }
             } else if let Some(targets) = parse_live_literal(trimmed) {
                 format!("\"{SEQUENCE_LITERAL_PREFIX}{}\"", targets.join("|"))
@@ -130,6 +136,13 @@ fn can_precede_runtime_index(last_significant: Option<char>) -> bool {
         last_significant,
         Some(ch) if ch == '_' || ch.is_ascii_alphanumeric() || ch == ')' || ch == ']'
     )
+}
+
+fn parse_value_element_type(text: &str) -> Option<&str> {
+    match text {
+        "Int" | "Float" | "Bool" | "String" => Some(text),
+        _ => None,
+    }
 }
 
 fn parse_live_literal(text: &str) -> Option<Vec<String>> {

@@ -3,6 +3,7 @@ use std::fmt;
 use crate::reduction_surface::{decode_reduction, ReductionSpec};
 use crate::sequence_surface::{
     decode_sequence_index_segment, decode_sequence_literal, decode_sequence_live_type,
+    decode_sequence_value_type,
 };
 
 pub const LIVE_TYPE_PREFIX: &str = "__elanu_surface_live_type$";
@@ -752,6 +753,8 @@ fn write_expr(f: &mut fmt::Formatter<'_>, expr: &Expr, depth: usize) -> fmt::Res
 fn display_surface_type_name(type_name: &str) -> String {
     if let Some(model) = decode_live_type_name(type_name) {
         format!("live {model}")
+    } else if let Some(element) = decode_sequence_value_type(type_name) {
+        format!("[{element}]")
     } else if let Some(model) = decode_sequence_live_type(type_name) {
         format!("[live {model}]")
     } else {

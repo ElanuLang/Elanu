@@ -9,6 +9,7 @@ use crate::reduction_surface::ReductionSpec;
 use crate::runtime_sequence_markers::{
     decode_runtime_sequence_type, decode_runtime_sequence_value,
 };
+use crate::sequence_surface::decode_sequence_value_type;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ValueType {
@@ -16,6 +17,7 @@ pub enum ValueType {
     Float,
     Bool,
     String,
+    Sequence(Box<ValueType>),
     SequenceLive(String),
     Named(String),
 }
@@ -845,6 +847,11 @@ pub(crate) fn parse_primitive_type_name(name: &str) -> Option<ValueType> {
 }
 
 fn parse_source_type_name(name: &str) -> Option<ValueType> {
+    if let Some(element_name) = decode_sequence_value_type(name) {
+        let element_type = parse_primitive_type_name(element_name)?;
+        return Some(ValueType::Sequence(Box::new(element_type)));
+    }
+
     if let Some(model) = decode_runtime_sequence_type(name) {
         return Some(ValueType::SequenceLive(model.to_string()));
     }
@@ -862,6 +869,7 @@ pub fn show_type(value_type: &ValueType) -> String {
         ValueType::Float => "Float".to_string(),
         ValueType::Bool => "Bool".to_string(),
         ValueType::String => "String".to_string(),
+        ValueType::Sequence(element) => format!("[{}]", show_type(element)),
         ValueType::SequenceLive(model) => format!("[live {model}]"),
         ValueType::Named(name) => name.clone(),
     }
