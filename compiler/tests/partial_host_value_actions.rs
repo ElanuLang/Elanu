@@ -143,3 +143,37 @@ fn host_value_boundary_rejects_identity_sequences() {
         .expect_err("host must not inject modeled identity sequences");
     assert!(error.message.contains("identity sequences"));
 }
+
+/// Host-supplied values carry data, not authority.
+///
+/// A writable state parameter names a caller-selected state slot that the host
+/// must name explicitly at the call site; a `Value` cannot express that
+/// designation. So every writable state parameter is rejected outright on the
+/// value boundary rather than being silently bound to some slot.
+#[test]
+fn host_values_cannot_supply_writable_state_authority() {
+    let source = r#"
+state counter = 0
+
+action bump(state target: Int) {
+    target += 1
+}
+"#;
+
+    let checked =
+        check_source_with_runtime_models(source).expect("writable state parameter should check");
+    let mut runtime = PartialPersistentRuntime::open(checked, MemoryProvider::default())
+        .expect("fresh partial runtime should open");
+
+    let error = runtime
+        .run_action_with_values("bump", &[Value::Int(1)])
+        .expect_err("host values must not supply writable state authority");
+
+    assert!(
+        error
+            .message
+            .contains("cannot supply writable state parameter"),
+        "unexpected writable-state rejection: {}",
+        error.message
+    );
+}

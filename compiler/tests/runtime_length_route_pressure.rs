@@ -9,10 +9,10 @@
 //! composition pressure:
 //!
 //! 1. repeated top-level host action calls are separate transactions;
-//! 2. `[Int]` can now cross the plain runtime action boundary, but the
-//!    partial-persistent host bridge still cannot carry that structured value.
+//! 2. `[Int]` now crosses the partial-persistent host action boundary as an
+//!    already-structured runtime value.
 //!
-//! Neither result selects a solution.
+//! These facts still do not select a route-consumption mechanism.
 
 use std::collections::HashMap;
 
@@ -271,19 +271,16 @@ action acceptFolders(route: [live Folder]) {
     );
 }
 
-/// Ordinary `[Int]` action parameters now check, and the plain runtime can
-/// receive a runtime-sized `ValueSequence`.
+/// Ordinary `[Int]` action parameters check, and both the plain runtime and the
+/// partial-persistent host bridge now receive a runtime-sized `ValueSequence`.
 ///
-/// The partial-persistent host bridge is still narrower: it reconstructs host
-/// values as source-shaped action arguments, and therefore cannot yet carry an
-/// ordinary sequence value.
-///
-/// This isolates the remaining representation obstacle before route traversal:
-/// preserve the already-structured ordinary sequence through the
-/// partial-persistence action boundary without reparsing or inventing source
-/// expression structure.
+/// The partial-persistent bridge routes ordinary sequences through the runtime
+/// action-value path rather than reconstructing them as source expressions. This
+/// proves only that the boundary carries them: nothing here indexes, traverses,
+/// mutates, persists, or routes over the sequence, and retry, rollback,
+/// dormant-backing, and durable-publication behavior are unchanged.
 #[test]
-fn partial_persistent_host_bridge_does_not_yet_carry_ordinary_sequences() {
+fn partial_persistent_host_bridge_carries_ordinary_sequences() {
     let source = format!(
         "{CABINET}\n{}",
         r#"
@@ -298,7 +295,7 @@ action acceptRoute(route: [Int]) {
     let mut runtime = PartialPersistentRuntime::open(checked, MemoryProvider::default())
         .expect("partial-persistent runtime should initialize");
 
-    let error = runtime
+    runtime
         .run_action_with_values(
             "acceptRoute",
             &[Value::ValueSequence(vec![
@@ -307,13 +304,96 @@ action acceptRoute(route: [Int]) {
                 Value::Int(1),
             ])],
         )
-        .expect_err("partial-persistent host bridge should not yet carry ordinary sequences");
+        .expect("partial-persistent host bridge should carry an ordinary sequence");
+}
+
+/// A modeled identity sequence is a distinct surface and must stay invisible to
+/// host action values even on the runtime-value path.
+///
+/// The argument list here is otherwise valid: `acceptRoutes` declares exactly
+/// two `[Int]` parameters and receives two arguments. So this establishes that
+/// the rejection is the identity firewall itself, not an arity error that
+/// happened to fire first.
+#[test]
+fn partial_persistent_host_bridge_still_rejects_identity_sequences() {
+    let source = format!(
+        "{CABINET}\n{}",
+        r#"
+action acceptRoutes(first: [Int], second: [Int]) {
+}
+"#
+    );
+
+    let checked = check_source_with_runtime_models(&source)
+        .expect("two [Int] action parameters should check");
+
+    let mut runtime = PartialPersistentRuntime::open(checked, MemoryProvider::default())
+        .expect("partial-persistent runtime should initialize");
+
+    let error = runtime
+        .run_action_with_values(
+            "acceptRoutes",
+            &[
+                Value::ValueSequence(vec![Value::Int(0)]),
+                Value::Sequence {
+                    element_model: "Folder".into(),
+                    targets: Vec::new(),
+                },
+            ],
+        )
+        .expect_err("modeled identity sequences must remain invisible to host action values");
 
     assert!(
         error
             .message
-            .contains("do not yet carry ordinary sequences"),
-        "unexpected ordinary-sequence host-bridge rejection: {}",
+            .contains("cannot carry modeled identity sequences"),
+        "unexpected identity-sequence rejection: {}",
+        error.message
+    );
+}
+
+/// Modeled identity must stay host-invisible even when nested inside an ordinary
+/// value sequence.
+///
+/// `Value::ValueSequence` is recursively structured, so a shallow top-level guard
+/// would let a nested identity sequence reach coercion. Today no source type is
+/// `[[T]]`, so that nested value would fail an expected-type mismatch rather
+/// than the identity firewall. This test pins the structural rejection instead,
+/// so the contract holds by construction rather than by incidental typing.
+///
+/// Using `[[live Folder]]` here would be stronger still, but the language has no
+/// nested ordered-sequence syntax to declare it.
+#[test]
+fn partial_persistent_host_bridge_rejects_nested_identity_sequences() {
+    let source = format!(
+        "{CABINET}\n{}",
+        r#"
+action acceptNested(route: [Int]) {
+}
+"#
+    );
+
+    let checked =
+        check_source_with_runtime_models(&source).expect("[Int] action parameter should check");
+
+    let mut runtime = PartialPersistentRuntime::open(checked, MemoryProvider::default())
+        .expect("partial-persistent runtime should initialize");
+
+    let error = runtime
+        .run_action_with_values(
+            "acceptNested",
+            &[Value::ValueSequence(vec![Value::Sequence {
+                element_model: "Folder".into(),
+                targets: Vec::new(),
+            }])],
+        )
+        .expect_err("modeled identity must remain host-invisible even when nested");
+
+    assert!(
+        error
+            .message
+            .contains("cannot carry modeled identity sequences"),
+        "unexpected nested identity rejection: {}",
         error.message
     );
 }

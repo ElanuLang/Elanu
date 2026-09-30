@@ -430,20 +430,36 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
     }
 
     pub fn run_action(&mut self, name: &str) -> Result<(), RuntimeError> {
-        self.run_action_with_arguments(name, &[])
+        self.run_action_invocation(name, HostActionInvocation::Arguments(&[]))
     }
 
+    /// Host-supplied arguments are concrete runtime values, so they enter the
+    /// action as runtime values. None of them are reconstructed as source
+    /// expressions, which would leak representation and would have no form at
+    /// all for a runtime-sized sequence.
+    ///
+    /// A `Value` conveys data, not authority. A writable state parameter names
+    /// a caller-selected state slot that only an explicit call-site grant can
+    /// supply, so such a parameter is always rejected here.
+    ///
+    /// `Value::Sequence` remains host-invisible: it carries modeled designation
+    /// identity, which this boundary has deliberately never exposed.
+    ///
+    /// Compiler-generated builtin action names are internal. They are reached
+    /// through the source-shaped argument path, not through this host-value
+    /// boundary, so they are outside this API's contract.
     pub fn run_action_with_values(
         &mut self,
         name: &str,
         values: &[Value],
     ) -> Result<(), RuntimeError> {
-        let arguments = values
-            .iter()
-            .map(host_value_action_argument)
-            .collect::<Result<Vec<_>, _>>()?;
+        if values.iter().any(contains_modeled_identity_sequence) {
+            return Err(RuntimeError::new(
+                "partial persistent host action values cannot carry modeled identity sequences",
+            ));
+        }
 
-        self.run_action_with_arguments(name, &arguments)
+        self.run_action_invocation(name, HostActionInvocation::Values(values))
     }
 
     fn load_action_local_backing(
@@ -484,10 +500,10 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
         Ok(ActionLocalBacking { values, payload })
     }
 
-    fn run_action_with_arguments(
+    fn run_action_invocation(
         &mut self,
         name: &str,
-        arguments: &[ActionArgument],
+        invocation: HostActionInvocation<'_>,
     ) -> Result<(), RuntimeError> {
         if self.runtime.transaction.is_some() {
             return Err(RuntimeError::new(
@@ -519,7 +535,16 @@ impl<P: PartialPersistenceProvider> PartialPersistentRuntime<P> {
                 )?;
             }
 
-            match self.runtime.invoke_action(name, arguments) {
+            let attempt = match &invocation {
+                HostActionInvocation::Arguments(arguments) => {
+                    self.runtime.invoke_action(name, arguments)
+                }
+                HostActionInvocation::Values(values) => {
+                    self.runtime.invoke_action_with_values(name, values)
+                }
+            };
+
+            match attempt {
                 Ok(()) => {
                     break self.runtime.transaction.take().expect(
                         "successful partial persistent action should retain its transaction",
@@ -803,25 +828,28 @@ fn upsert_backing_replacement(
     }
 }
 
-fn host_value_action_argument(value: &Value) -> Result<ActionArgument, RuntimeError> {
-    let expression = match value {
-        Value::Int(value) => Expr::Integer(*value),
-        Value::Float(value) => Expr::Float(*value),
-        Value::Bool(value) => Expr::Bool(*value),
-        Value::String(value) => Expr::String(value.clone()),
-        Value::ValueSequence(_) => {
-            return Err(RuntimeError::new(
-                "partial persistent host action values do not yet carry ordinary sequences",
-            ));
-        }
-        Value::Sequence { .. } => {
-            return Err(RuntimeError::new(
-                "partial persistent host action values cannot carry modeled identity sequences",
-            ));
-        }
-    };
+/// Whether a host value carries modeled designation identity anywhere within it.
+///
+/// Ordinary value sequences are recursively structured, so a modeled identity
+/// sequence can be nested inside one. Modeled identity is host-invisible, so the
+/// check must be structural rather than relying on a later expected-type
+/// mismatch to reject the nested form.
+fn contains_modeled_identity_sequence(value: &Value) -> bool {
+    match value {
+        Value::Sequence { .. } => true,
+        Value::ValueSequence(values) => values.iter().any(contains_modeled_identity_sequence),
+        Value::Int(_) | Value::Float(_) | Value::Bool(_) | Value::String(_) => false,
+    }
+}
 
-    Ok(ActionArgument::Value(expression))
+/// Which invocation mechanism carries host-supplied arguments into the shared
+/// retry/materialization loop.
+///
+/// A no-argument host action has no runtime values to bind, so it takes the
+/// source-shaped path; host-supplied values always take the runtime-value path.
+enum HostActionInvocation<'a> {
+    Arguments(&'a [ActionArgument]),
+    Values(&'a [Value]),
 }
 
 fn encode_key(token: u64) -> Vec<u8> {
