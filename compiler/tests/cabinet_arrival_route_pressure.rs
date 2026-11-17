@@ -60,9 +60,8 @@ fn open_cabinet() -> (
     PartialPersistentRuntime<MemoryProvider>,
 ) {
     let checked = check_source_with_runtime_models(SOURCE).expect("cabinet source should check");
-    let mut runtime =
-        PartialPersistentRuntime::open(checked.clone(), MemoryProvider::default())
-            .expect("fresh cabinet should open");
+    let mut runtime = PartialPersistentRuntime::open(checked.clone(), MemoryProvider::default())
+        .expect("fresh cabinet should open");
 
     runtime
         .run_action("initialize")
