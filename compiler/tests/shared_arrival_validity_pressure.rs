@@ -314,4 +314,3 @@ fn failed_route_step_preserves_prior_arrival_context() {
     session.up().expect("Up still resolves from Projects");
     assert_eq!(session.selected_name(), "Notes");
 }
-
