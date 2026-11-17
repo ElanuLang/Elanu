@@ -245,6 +245,7 @@ pub struct Runtime {
     derived: HashMap<String, DerivedCell>,
     actions: HashMap<String, ActionDecl>,
     action_parameter_types: HashMap<String, Vec<ValueType>>,
+    lifted_action_calls: HashMap<(usize, usize, String), usize>,
     binding_order: Vec<(BindingKind, String)>,
     eval_stack: Vec<String>,
     action_stack: Vec<String>,
@@ -270,6 +271,13 @@ impl Runtime {
             derived: HashMap::new(),
             actions: HashMap::new(),
             action_parameter_types: HashMap::new(),
+            lifted_action_calls: program
+                .lifted_action_calls()
+                .iter()
+                .map(|(location, name, index)| {
+                    ((location.line, location.column, name.clone()), *index)
+                })
+                .collect(),
             binding_order: Vec::new(),
             eval_stack: Vec::new(),
             action_stack: Vec::new(),
@@ -1251,66 +1259,54 @@ impl Runtime {
         &mut self,
         name: &str,
         arguments: &[ActionArgument],
+        lifted_index: Option<usize>,
     ) -> Result<(), RuntimeError> {
-        let Some(action) = self.actions.get(name).cloned() else {
+        let Some(lifted_index) = lifted_index else {
             return self.invoke_action(name, arguments);
         };
 
+        let action = self
+            .actions
+            .get(name)
+            .cloned()
+            .ok_or_else(|| RuntimeError::new(format!("unknown action '{name}'")))?;
+
         if action.parameters.len() != arguments.len() {
-            return self.invoke_action(name, arguments);
+            return Err(RuntimeError::new(format!(
+                "action '{}' expects {} arguments but got {}",
+                name,
+                action.parameters.len(),
+                arguments.len()
+            )));
         }
 
         if arguments
             .iter()
             .any(|argument| !matches!(argument, ActionArgument::Value(_)))
         {
-            return self.invoke_action(name, arguments);
+            return Err(RuntimeError::new(
+                "checked sequence-lifted action call cannot include writable state arguments",
+            ));
         }
 
-        let parameter_types = self
-            .action_parameter_types
-            .get(name)
-            .cloned()
-            .ok_or_else(|| {
-                RuntimeError::new(format!(
-                    "checked parameter type information missing for action '{name}'"
-                ))
-            })?;
-
-        // Preserve the established source-shaped invocation path unless this
-        // call actually contains an ordinary sequence that must be lifted.
-        //
-        // Evaluating ordinary calls through the value path would bypass
-        // compiler-generated builtin dispatch and other source-call behavior.
         let mut values = Vec::with_capacity(arguments.len());
-        let mut lifted_index = None;
 
-        for (index, (argument, expected)) in arguments.iter().zip(&parameter_types).enumerate() {
+        for argument in arguments {
             let ActionArgument::Value(expression) = argument else {
-                unreachable!("non-value arguments returned through the source-shaped path");
+                unreachable!("checked lifted call contains only value arguments");
             };
 
-            let value = self.eval_expr(expression, None)?;
-
-            if matches!(value, Value::ValueSequence(_))
-                && !matches!(expected, ValueType::Sequence(_))
-            {
-                if lifted_index.is_some() {
-                    return self.invoke_action(name, arguments);
-                }
-
-                lifted_index = Some(index);
-            }
-
-            values.push(value);
+            values.push(self.eval_expr(expression, None)?);
         }
 
-        let Some(lifted_index) = lifted_index else {
-            return self.invoke_action(name, arguments);
-        };
+        let lifted_value = values.get(lifted_index).cloned().ok_or_else(|| {
+            RuntimeError::new("checked sequence-lifted argument index is out of bounds")
+        })?;
 
-        let Value::ValueSequence(elements) = values[lifted_index].clone() else {
-            unreachable!("lifted position must contain an ordinary value sequence");
+        let Value::ValueSequence(elements) = lifted_value else {
+            return Err(RuntimeError::new(
+                "checked sequence-lifted argument did not evaluate to an ordinary sequence",
+            ));
         };
 
         for element in elements {
@@ -1321,6 +1317,7 @@ impl Runtime {
 
         Ok(())
     }
+
     fn invoke_action(
         &mut self,
         name: &str,
@@ -2407,8 +2404,17 @@ impl Runtime {
                 self.write_state(&state_name, next)
             }
             Statement::ActionCall {
-                name, arguments, ..
-            } => self.invoke_source_action_call(name, arguments),
+                location,
+                name,
+                arguments,
+            } => {
+                let lifted_index = self
+                    .lifted_action_calls
+                    .get(&(location.line, location.column, name.clone()))
+                    .copied();
+
+                self.invoke_source_action_call(name, arguments, lifted_index)
+            }
             Statement::Fail { message, .. } => match self.eval_expr(message, None)? {
                 Value::String(message) => {
                     Err(RuntimeError::new(format!("action failed: {message}")))
