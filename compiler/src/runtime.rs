@@ -1247,6 +1247,80 @@ impl Runtime {
         Ok(frame)
     }
 
+    fn invoke_source_action_call(
+        &mut self,
+        name: &str,
+        arguments: &[ActionArgument],
+    ) -> Result<(), RuntimeError> {
+        let Some(action) = self.actions.get(name).cloned() else {
+            return self.invoke_action(name, arguments);
+        };
+
+        if action.parameters.len() != arguments.len() {
+            return self.invoke_action(name, arguments);
+        }
+
+        if arguments
+            .iter()
+            .any(|argument| !matches!(argument, ActionArgument::Value(_)))
+        {
+            return self.invoke_action(name, arguments);
+        }
+
+        let parameter_types = self
+            .action_parameter_types
+            .get(name)
+            .cloned()
+            .ok_or_else(|| {
+                RuntimeError::new(format!(
+                    "checked parameter type information missing for action '{name}'"
+                ))
+            })?;
+
+        // Preserve the established source-shaped invocation path unless this
+        // call actually contains an ordinary sequence that must be lifted.
+        //
+        // Evaluating ordinary calls through the value path would bypass
+        // compiler-generated builtin dispatch and other source-call behavior.
+        let mut values = Vec::with_capacity(arguments.len());
+        let mut lifted_index = None;
+
+        for (index, (argument, expected)) in arguments.iter().zip(&parameter_types).enumerate() {
+            let ActionArgument::Value(expression) = argument else {
+                unreachable!("non-value arguments returned through the source-shaped path");
+            };
+
+            let value = self.eval_expr(expression, None)?;
+
+            if matches!(value, Value::ValueSequence(_))
+                && !matches!(expected, ValueType::Sequence(_))
+            {
+                if lifted_index.is_some() {
+                    return self.invoke_action(name, arguments);
+                }
+
+                lifted_index = Some(index);
+            }
+
+            values.push(value);
+        }
+
+        let Some(lifted_index) = lifted_index else {
+            return self.invoke_action(name, arguments);
+        };
+
+        let Value::ValueSequence(elements) = values[lifted_index].clone() else {
+            unreachable!("lifted position must contain an ordinary value sequence");
+        };
+
+        for element in elements {
+            let mut step_values = values.clone();
+            step_values[lifted_index] = element;
+            self.invoke_action_with_values(name, &step_values)?;
+        }
+
+        Ok(())
+    }
     fn invoke_action(
         &mut self,
         name: &str,
@@ -2334,7 +2408,7 @@ impl Runtime {
             }
             Statement::ActionCall {
                 name, arguments, ..
-            } => self.invoke_action(name, arguments),
+            } => self.invoke_source_action_call(name, arguments),
             Statement::Fail { message, .. } => match self.eval_expr(message, None)? {
                 Value::String(message) => {
                     Err(RuntimeError::new(format!("action failed: {message}")))

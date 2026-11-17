@@ -533,13 +533,56 @@ impl Checker {
             return;
         }
 
-        for (parameter, argument) in parameters.iter().zip(arguments) {
+        let inferred_value_types = parameters
+            .iter()
+            .zip(arguments)
+            .map(|(parameter, argument)| match (parameter.kind, argument) {
+                (ActionParameterKind::Value, ActionArgument::Value(expression)) => {
+                    self.infer_expr(expression)
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+
+        let lift_count = parameters
+            .iter()
+            .zip(arguments)
+            .zip(&inferred_value_types)
+            .filter(|((parameter, argument), actual)| {
+                let (ActionParameterKind::Value, ActionArgument::Value(_), Some(actual)) =
+                    (parameter.kind, *argument, actual.as_ref())
+                else {
+                    return false;
+                };
+
+                let expected = parse_type_name(&parameter.type_name);
+                sequence_lift_assignable(&expected, actual)
+            })
+            .count();
+
+        if lift_count == 1
+            && parameters
+                .iter()
+                .any(|parameter| parameter.kind == ActionParameterKind::State)
+        {
+            self.error(
+                "sequence-lifted action call cannot include writable state parameters".to_string(),
+            );
+        }
+
+        for ((parameter, argument), actual) in
+            parameters.iter().zip(arguments).zip(inferred_value_types)
+        {
             let expected = parse_type_name(&parameter.type_name);
 
             match (parameter.kind, argument) {
-                (ActionParameterKind::Value, ActionArgument::Value(expression)) => {
-                    if let Some(actual) = self.infer_expr(expression) {
-                        if !assignable_to(&expected, &actual) {
+                (ActionParameterKind::Value, ActionArgument::Value(_)) => {
+                    if let Some(actual) = actual {
+                        let ordinary = assignable_to(&expected, &actual);
+                        let lifted =
+                            lift_count == 1 && sequence_lift_assignable(&expected, &actual);
+
+                        if !ordinary && !lifted {
                             self.error(format!(
                                 "argument for value parameter '{}' has type {} but expected {}",
                                 parameter.name,
@@ -587,7 +630,6 @@ impl Checker {
             }
         }
     }
-
     fn resolve_writable_state_grant(&mut self, name: &str) -> Option<ValueType> {
         if let Some(parameter) = self.parameters.get(name).cloned() {
             return match parameter.kind {
@@ -883,6 +925,13 @@ pub(crate) fn types_compatible(a: &ValueType, b: &ValueType) -> bool {
     a == b || (is_numeric(a) && is_numeric(b))
 }
 
+fn sequence_lift_assignable(target: &ValueType, source: &ValueType) -> bool {
+    let ValueType::Sequence(element) = source else {
+        return false;
+    };
+
+    assignable_to(target, element)
+}
 pub(crate) fn assignable_to(target: &ValueType, source: &ValueType) -> bool {
     target == source || (matches!(target, ValueType::Float) && matches!(source, ValueType::Int))
 }

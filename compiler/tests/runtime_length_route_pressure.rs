@@ -397,3 +397,152 @@ action acceptNested(route: [Int]) {
         error.message
     );
 }
+/// One ordinary sequence argument can drive ordered repeated action application
+/// without exposing traversal machinery.
+///
+/// The route elements are applied in sequence order inside the enclosing action's
+/// existing transaction. A later failure therefore rolls back all earlier route
+/// steps together.
+#[test]
+fn one_sequence_argument_replays_route_atomically() {
+    let source = format!(
+        "{CABINET}\n{}",
+        r#"
+action replayRoute(route: [Int]) {
+    selectHome()
+    selectFolder(route)
+}
+"#
+    );
+
+    let checked = check_source_with_runtime_models(&source)
+        .expect("single ordered argument should infer repeated action application");
+
+    let mut runtime = PartialPersistentRuntime::open(checked, MemoryProvider::default())
+        .expect("runtime should initialize");
+
+    runtime
+        .run_action("initialize")
+        .expect("initialize should commit");
+
+    runtime
+        .run_action_with_values("createFolder", &[Value::String("Projects".into())])
+        .expect("Projects creation should commit");
+
+    runtime
+        .run_action_with_values("createFolder", &[Value::String("Elanu".into())])
+        .expect("Elanu creation should commit");
+
+    runtime
+        .run_action_with_values(
+            "replayRoute",
+            &[Value::ValueSequence(vec![Value::Int(0), Value::Int(0)])],
+        )
+        .expect("runtime-sized route should replay atomically");
+
+    assert_eq!(
+        runtime.value("selectedFolderName").unwrap(),
+        Value::String("Elanu".into())
+    );
+
+    runtime
+        .run_action("selectHome")
+        .expect("Home reset should commit");
+
+    let error = runtime
+        .run_action_with_values(
+            "replayRoute",
+            &[Value::ValueSequence(vec![Value::Int(0), Value::Int(9)])],
+        )
+        .expect_err("later route failure should roll back the whole replay");
+
+    assert!(
+        error.message.contains("out of bounds"),
+        "unexpected route failure: {}",
+        error.message
+    );
+
+    assert_eq!(
+        runtime.value("selectedFolderName").unwrap(),
+        Value::String("Notes".into()),
+        "later route failure must roll the complete runtime-sized replay back"
+    );
+}
+/// Pressure probe: automatic action lifting is not mechanically inferable when
+/// more than one ordered argument would need traversal.
+///
+/// Given two `[Int]` values and an action expecting two `Int` values, source
+/// syntax alone does not tell us whether application means zip, Cartesian
+/// product, broadcasting, or something else.
+///
+/// This prevents the single-sequence route case from accidentally selecting a
+/// general "sequence arguments automatically lift action calls" rule.
+#[test]
+fn multiple_sequence_arguments_do_not_select_a_general_lifting_rule() {
+    let source = r#"
+action consumePair(left: Int, right: Int) {
+}
+
+action consumeRoutes(left: [Int], right: [Int]) {
+    consumePair(left, right)
+}
+"#;
+
+    let errors = check_source_with_runtime_models(source)
+        .expect_err("multiple sequence arguments should not implicitly select traversal semantics");
+
+    assert!(
+        errors
+            .iter()
+            .any(|error| { error.message.contains("has type [Int] but expected Int") }),
+        "unexpected multiple-sequence diagnostics: {errors:?}"
+    );
+}
+/// Scalar companion arguments are evaluated once at the lifted call site and
+/// reused for every ordered application.
+///
+/// `offset` begins at 10. Each step mutates the state `offset`, but the value
+/// supplied to `consumeStep` remains the original captured 10. If the companion
+/// expression were re-evaluated per element, `total` would become 21 instead of
+/// 20.
+#[test]
+fn one_sequence_argument_reuses_scalar_companion_value() {
+    let source = r#"
+state offset = 10
+state total = 0
+
+action consumeStep(index: Int, value: Int) {
+    total += value
+    offset += 1
+}
+
+action consumeRoute(route: [Int]) {
+    consumeStep(route, offset)
+}
+"#;
+
+    let checked = check_source_with_runtime_models(source)
+        .expect("one sequence argument with a scalar companion should check");
+
+    let mut runtime = PartialPersistentRuntime::open(checked, MemoryProvider::default())
+        .expect("runtime should initialize");
+
+    runtime
+        .run_action_with_values(
+            "consumeRoute",
+            &[Value::ValueSequence(vec![Value::Int(1), Value::Int(2)])],
+        )
+        .expect("ordered application with scalar companion should succeed");
+
+    assert_eq!(
+        runtime.value("total").unwrap(),
+        Value::Int(20),
+        "scalar companion should be captured once and reused"
+    );
+
+    assert_eq!(
+        runtime.value("offset").unwrap(),
+        Value::Int(12),
+        "each repeated application should still observe and mutate shared transaction state"
+    );
+}
