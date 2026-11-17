@@ -9,6 +9,7 @@ use crate::reduction_surface::ReductionSpec;
 use crate::runtime_sequence_markers::{
     decode_runtime_sequence_type, decode_runtime_sequence_value,
 };
+use crate::sequence_surface::decode_sequence_value_type;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ValueType {
@@ -16,6 +17,7 @@ pub enum ValueType {
     Float,
     Bool,
     String,
+    Sequence(Box<ValueType>),
     SequenceLive(String),
     Named(String),
 }
@@ -34,6 +36,7 @@ pub struct CheckedProgram {
     binding_types: HashMap<String, ValueType>,
     action_parameter_types: HashMap<String, Vec<ValueType>>,
     runtime_reductions: HashMap<String, RuntimeReductionPayload>,
+    lifted_action_calls: Vec<(SourceLocation, String, usize)>,
 }
 
 impl CheckedProgram {
@@ -47,6 +50,10 @@ impl CheckedProgram {
 
     pub fn runtime_reduction(&self, name: &str) -> Option<&RuntimeReductionPayload> {
         self.runtime_reductions.get(name)
+    }
+
+    pub(crate) fn lifted_action_calls(&self) -> &[(SourceLocation, String, usize)] {
+        &self.lifted_action_calls
     }
 }
 
@@ -112,6 +119,7 @@ pub fn check_with_runtime_reductions(
         action_signatures,
         parameters: HashMap::new(),
         runtime_reduction_types,
+        lifted_action_calls: Vec::new(),
         errors: Vec::new(),
         current_location: SourceLocation::new(1, 1),
     };
@@ -142,6 +150,7 @@ pub fn check_with_runtime_reductions(
             binding_types,
             action_parameter_types,
             runtime_reductions,
+            lifted_action_calls: checker.lifted_action_calls,
         })
     } else {
         Err(checker.errors)
@@ -154,6 +163,7 @@ struct Checker {
     action_signatures: HashMap<String, Vec<ActionParameter>>,
     parameters: HashMap<String, LocalSymbol>,
     runtime_reduction_types: HashMap<String, ValueType>,
+    lifted_action_calls: Vec<(SourceLocation, String, usize)>,
     errors: Vec<Diagnostic>,
     current_location: SourceLocation,
 }
@@ -531,13 +541,65 @@ impl Checker {
             return;
         }
 
-        for (parameter, argument) in parameters.iter().zip(arguments) {
+        let inferred_value_types = parameters
+            .iter()
+            .zip(arguments)
+            .map(|(parameter, argument)| match (parameter.kind, argument) {
+                (ActionParameterKind::Value, ActionArgument::Value(expression)) => {
+                    self.infer_expr(expression)
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+
+        let lifted_indices = parameters
+            .iter()
+            .zip(arguments)
+            .zip(&inferred_value_types)
+            .enumerate()
+            .filter_map(|(index, ((parameter, argument), actual))| {
+                let (ActionParameterKind::Value, ActionArgument::Value(_), Some(actual)) =
+                    (parameter.kind, argument, actual.as_ref())
+                else {
+                    return None;
+                };
+
+                let expected = parse_type_name(&parameter.type_name);
+                sequence_lift_assignable(&expected, actual).then_some(index)
+            })
+            .collect::<Vec<_>>();
+
+        let lifted_index = match lifted_indices.as_slice() {
+            [index] => Some(*index),
+            _ => None,
+        };
+
+        let has_state_parameter = parameters
+            .iter()
+            .any(|parameter| parameter.kind == ActionParameterKind::State);
+
+        if lifted_index.is_some() && has_state_parameter {
+            self.error(
+                "sequence-lifted action call cannot include writable state parameters".to_string(),
+            );
+        }
+
+        for (index, ((parameter, argument), actual)) in parameters
+            .iter()
+            .zip(arguments)
+            .zip(inferred_value_types)
+            .enumerate()
+        {
             let expected = parse_type_name(&parameter.type_name);
 
             match (parameter.kind, argument) {
-                (ActionParameterKind::Value, ActionArgument::Value(expression)) => {
-                    if let Some(actual) = self.infer_expr(expression) {
-                        if !assignable_to(&expected, &actual) {
+                (ActionParameterKind::Value, ActionArgument::Value(_)) => {
+                    if let Some(actual) = actual {
+                        let ordinary = assignable_to(&expected, &actual);
+                        let lifted = lifted_index == Some(index)
+                            && sequence_lift_assignable(&expected, &actual);
+
+                        if !ordinary && !lifted {
                             self.error(format!(
                                 "argument for value parameter '{}' has type {} but expected {}",
                                 parameter.name,
@@ -582,6 +644,16 @@ impl Checker {
                         }
                     }
                 }
+            }
+        }
+
+        if let Some(lifted_index) = lifted_index {
+            if !has_state_parameter {
+                self.lifted_action_calls.push((
+                    self.current_location,
+                    name.to_string(),
+                    lifted_index,
+                ));
             }
         }
     }
@@ -845,6 +917,11 @@ pub(crate) fn parse_primitive_type_name(name: &str) -> Option<ValueType> {
 }
 
 fn parse_source_type_name(name: &str) -> Option<ValueType> {
+    if let Some(element_name) = decode_sequence_value_type(name) {
+        let element_type = parse_primitive_type_name(element_name)?;
+        return Some(ValueType::Sequence(Box::new(element_type)));
+    }
+
     if let Some(model) = decode_runtime_sequence_type(name) {
         return Some(ValueType::SequenceLive(model.to_string()));
     }
@@ -862,6 +939,7 @@ pub fn show_type(value_type: &ValueType) -> String {
         ValueType::Float => "Float".to_string(),
         ValueType::Bool => "Bool".to_string(),
         ValueType::String => "String".to_string(),
+        ValueType::Sequence(element) => format!("[{}]", show_type(element)),
         ValueType::SequenceLive(model) => format!("[live {model}]"),
         ValueType::Named(name) => name.clone(),
     }
@@ -873,6 +951,14 @@ fn is_numeric(value_type: &ValueType) -> bool {
 
 pub(crate) fn types_compatible(a: &ValueType, b: &ValueType) -> bool {
     a == b || (is_numeric(a) && is_numeric(b))
+}
+
+fn sequence_lift_assignable(target: &ValueType, source: &ValueType) -> bool {
+    let ValueType::Sequence(element) = source else {
+        return false;
+    };
+
+    assignable_to(target, element)
 }
 
 pub(crate) fn assignable_to(target: &ValueType, source: &ValueType) -> bool {

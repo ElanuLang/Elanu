@@ -292,6 +292,44 @@ Nested actions join the current transaction. They do not create implicit indepen
 
 Action calls are statement-only and currently return no value.
 
+### Ordered value application — selected/implemented
+
+An immutable ordinary sequence value may supply the traversal structure for one scalar
+value parameter of a nested action call:
+
+```elanu
+action selectFolder(index: Int) {
+    // ...
+}
+
+action replayRoute(route: [Int]) {
+    selectFolder(route)
+}
+```
+
+When exactly one ordinary value argument has type `[T]` while its corresponding
+ordinary value parameter expects `T`, and all other arguments are ordinary compatible
+value arguments, the call means ordered repeated application of that action once per
+sequence element.
+
+The ordered argument and all scalar companion arguments are evaluated once at the call
+site. Scalar companions are reused for every repeated application. An empty sequence
+performs zero applications.
+
+Each repeated application is an ordinary nested action invocation inside the existing
+shared action transaction. Later applications therefore observe state staged by earlier
+ones, and failure of any application rolls the complete enclosing action back.
+
+This inference is deliberately narrow:
+
+- two or more sequence-to-scalar argument mismatches are rejected rather than guessing
+  zip, Cartesian-product, broadcast, or nesting semantics;
+- a lifted call cannot include writable `state` parameters, because value traversal
+  does not infer or duplicate writable authority;
+- `[live T]` modeled-identity sequences are not ordinary value-sequence action input;
+- the rule does not add a general `each`/loop syntax, iterator/cursor API, `map`,
+  action return values, or general collection methods.
+
 ---
 
 # 7. Assignment — released
@@ -717,6 +755,11 @@ state lines: [live LineItem] = []
 ```
 
 Whole-sequence replacement inside actions is supported by the current sequence surface.
+
+Primitive-element ordinary sequences such as `[Int]` may also be immutable action
+parameters and may participate in the narrow ordered action-application rule described in
+Section 6. Current action-parameter support does not extend that value-input rule to
+`[live T]` structural identity sequences.
 
 The current language does **not** imply a conventional list API merely because sequence values exist.
 

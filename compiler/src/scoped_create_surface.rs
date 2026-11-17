@@ -1165,6 +1165,9 @@ fn lowered_type_name(value_type: &ValueType) -> String {
         ValueType::Float => "Float".to_string(),
         ValueType::Bool => "Bool".to_string(),
         ValueType::String => "String".to_string(),
+        ValueType::Sequence(element) => crate::sequence_surface::encode_sequence_value_type(
+            &crate::semantic::show_type(element),
+        ),
         ValueType::SequenceLive(model) => encode_runtime_sequence_type(model),
         ValueType::Named(name) => name.clone(),
     }

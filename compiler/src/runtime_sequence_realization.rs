@@ -542,7 +542,7 @@ fn lower_runtime_reduction(
         ValueType::Float => Expr::Float(0.0),
         ValueType::Bool => Expr::Bool(false),
         ValueType::String => Expr::String(String::new()),
-        ValueType::Named(_) | ValueType::SequenceLive(_) => {
+        ValueType::Named(_) | ValueType::Sequence(_) | ValueType::SequenceLive(_) => {
             unreachable!("unsupported runtime reduction result type was rejected above")
         }
     }

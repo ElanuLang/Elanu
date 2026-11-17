@@ -2,6 +2,8 @@ use std::collections::{HashMap, HashSet};
 
 use super::*;
 
+use crate::semantic::{show_type, ValueType};
+
 pub mod partial;
 
 const PERSISTENCE_ENCODING_MAGIC: &[u8; 8] = b"ELANUPST";
@@ -278,6 +280,12 @@ fn encode_value_type(
         ValueType::Float => encoder.u8(1),
         ValueType::Bool => encoder.u8(2),
         ValueType::String => encoder.u8(3),
+        ValueType::Sequence(_) => {
+            return Err(RuntimeError::new(format!(
+                "persistence for ordinary sequence type {} is not implemented",
+                show_type(value_type)
+            )));
+        }
         ValueType::SequenceLive(model) => {
             encoder.u8(4);
             encoder.string(model)?;
@@ -321,6 +329,11 @@ fn encode_value(encoder: &mut PersistenceEncoder, value: &Value) -> Result<(), R
         Value::String(value) => {
             encoder.u8(3);
             encoder.string(value)?;
+        }
+        Value::ValueSequence(_) => {
+            return Err(RuntimeError::new(
+                "persistence for ordinary sequence values is not implemented",
+            ));
         }
         Value::Sequence {
             element_model,

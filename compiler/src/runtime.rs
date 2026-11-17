@@ -48,6 +48,18 @@ pub enum Value {
     Float(f64),
     Bool(bool),
     String(String),
+
+    /// Ordinary ordered value sequence.
+    ///
+    /// Elements have ordinary value semantics. The checked expected
+    /// `ValueType::Sequence` supplies and validates the homogeneous element
+    /// type when the value crosses a typed boundary.
+    ValueSequence(Vec<Value>),
+
+    /// Ordered sequence of exact modeled-state designations.
+    ///
+    /// This is the runtime representation of `[live T]` structural identity,
+    /// not the representation of an ordinary `[T]` value sequence.
     Sequence {
         element_model: String,
         targets: Vec<String>,
@@ -61,6 +73,16 @@ impl fmt::Display for Value {
             Value::Float(value) => write!(f, "{value}"),
             Value::Bool(value) => write!(f, "{value}"),
             Value::String(value) => write!(f, "{value:?}"),
+            Value::ValueSequence(values) => {
+                write!(f, "[")?;
+                for (index, value) in values.iter().enumerate() {
+                    if index > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{value}")?;
+                }
+                write!(f, "]")
+            }
             Value::Sequence { targets, .. } => {
                 write!(f, "[")?;
                 for (index, target) in targets.iter().enumerate() {
@@ -223,6 +245,7 @@ pub struct Runtime {
     derived: HashMap<String, DerivedCell>,
     actions: HashMap<String, ActionDecl>,
     action_parameter_types: HashMap<String, Vec<ValueType>>,
+    lifted_action_calls: HashMap<(usize, usize, String), usize>,
     binding_order: Vec<(BindingKind, String)>,
     eval_stack: Vec<String>,
     action_stack: Vec<String>,
@@ -248,6 +271,13 @@ impl Runtime {
             derived: HashMap::new(),
             actions: HashMap::new(),
             action_parameter_types: HashMap::new(),
+            lifted_action_calls: program
+                .lifted_action_calls()
+                .iter()
+                .map(|(location, name, index)| {
+                    ((location.line, location.column, name.clone()), *index)
+                })
+                .collect(),
             binding_order: Vec::new(),
             eval_stack: Vec::new(),
             action_stack: Vec::new(),
@@ -405,6 +435,33 @@ impl Runtime {
 
         self.transaction = Some(Transaction::default());
         let result = self.invoke_action(name, &[]);
+
+        match result {
+            Ok(()) => {
+                let transaction = self.transaction.take().expect("transaction should exist");
+                self.commit(transaction);
+                Ok(())
+            }
+            Err(error) => {
+                self.transaction = None;
+                Err(error)
+            }
+        }
+    }
+
+    pub fn run_action_with_values(
+        &mut self,
+        name: &str,
+        values: &[Value],
+    ) -> Result<(), RuntimeError> {
+        if self.transaction.is_some() {
+            return Err(RuntimeError::new(
+            "run_action_with_values cannot start a new top-level action while a transaction is active",
+        ));
+        }
+
+        self.transaction = Some(Transaction::default());
+        let result = self.invoke_action_with_values(name, values);
 
         match result {
             Ok(()) => {
@@ -1106,6 +1163,159 @@ impl Runtime {
         };
 
         self.terminate_runtime_model_subtree(&target, &owner)
+    }
+
+    fn invoke_action_with_values(
+        &mut self,
+        name: &str,
+        values: &[Value],
+    ) -> Result<(), RuntimeError> {
+        if self.action_stack.iter().any(|entry| entry == name) {
+            let mut cycle = self.action_stack.join(" -> ");
+            if !cycle.is_empty() {
+                cycle.push_str(" -> ");
+            }
+            cycle.push_str(name);
+            return Err(RuntimeError::new(format!(
+                "recursive action call is not supported in the bootstrap runtime: {cycle}"
+            )));
+        }
+
+        let action = self
+            .actions
+            .get(name)
+            .cloned()
+            .ok_or_else(|| RuntimeError::new(format!("unknown action '{name}'")))?;
+
+        let frame = self.bind_action_values(&action, values)?;
+
+        self.action_stack.push(name.to_string());
+        self.action_frames.push(frame);
+
+        let result = self.exec_statements(&action.statements);
+
+        self.action_frames.pop();
+        self.action_stack.pop();
+
+        result
+    }
+
+    fn bind_action_values(
+        &mut self,
+        action: &ActionDecl,
+        values: &[Value],
+    ) -> Result<ActionFrame, RuntimeError> {
+        if action.parameters.len() != values.len() {
+            return Err(RuntimeError::new(format!(
+                "action '{}' expects {} arguments but got {}",
+                action.name,
+                action.parameters.len(),
+                values.len()
+            )));
+        }
+
+        let parameter_types = self
+            .action_parameter_types
+            .get(&action.name)
+            .cloned()
+            .ok_or_else(|| {
+                RuntimeError::new(format!(
+                    "checked parameter type information missing for action '{}'",
+                    action.name
+                ))
+            })?;
+
+        if parameter_types.len() != action.parameters.len() {
+            return Err(RuntimeError::new(format!(
+            "checked parameter type information for action '{}' has {} entries but the action declares {} parameters",
+            action.name,
+            parameter_types.len(),
+            action.parameters.len()
+        )));
+        }
+
+        let mut frame = ActionFrame::default();
+
+        for ((parameter, value), expected_type) in
+            action.parameters.iter().zip(values).zip(parameter_types)
+        {
+            if parameter.kind == ActionParameterKind::State {
+                return Err(RuntimeError::new(format!(
+                    "host value invocation cannot supply writable state parameter '{}'",
+                    parameter.name
+                )));
+            }
+
+            let value = coerce_value(value.clone(), &expected_type)?;
+            frame
+                .bindings
+                .insert(parameter.name.clone(), ActionBinding::Value(value));
+        }
+
+        Ok(frame)
+    }
+
+    fn invoke_source_action_call(
+        &mut self,
+        name: &str,
+        arguments: &[ActionArgument],
+        lifted_index: Option<usize>,
+    ) -> Result<(), RuntimeError> {
+        let Some(lifted_index) = lifted_index else {
+            return self.invoke_action(name, arguments);
+        };
+
+        let action = self
+            .actions
+            .get(name)
+            .cloned()
+            .ok_or_else(|| RuntimeError::new(format!("unknown action '{name}'")))?;
+
+        if action.parameters.len() != arguments.len() {
+            return Err(RuntimeError::new(format!(
+                "action '{}' expects {} arguments but got {}",
+                name,
+                action.parameters.len(),
+                arguments.len()
+            )));
+        }
+
+        if arguments
+            .iter()
+            .any(|argument| !matches!(argument, ActionArgument::Value(_)))
+        {
+            return Err(RuntimeError::new(
+                "checked sequence-lifted action call cannot include writable state arguments",
+            ));
+        }
+
+        let mut values = Vec::with_capacity(arguments.len());
+
+        for argument in arguments {
+            let ActionArgument::Value(expression) = argument else {
+                unreachable!("checked lifted call contains only value arguments");
+            };
+
+            values.push(self.eval_expr(expression, None)?);
+        }
+
+        let lifted_value = values.get(lifted_index).cloned().ok_or_else(|| {
+            RuntimeError::new("checked sequence-lifted argument index is out of bounds")
+        })?;
+
+        let Value::ValueSequence(elements) = lifted_value else {
+            return Err(RuntimeError::new(
+                "checked sequence-lifted argument did not evaluate to an ordinary sequence",
+            ));
+        };
+
+        for element in elements {
+            let mut step_values = values.clone();
+            step_values[lifted_index] = element;
+            self.invoke_action_with_values(name, &step_values)?;
+        }
+
+        Ok(())
     }
 
     fn invoke_action(
@@ -2194,8 +2404,17 @@ impl Runtime {
                 self.write_state(&state_name, next)
             }
             Statement::ActionCall {
-                name, arguments, ..
-            } => self.invoke_action(name, arguments),
+                location,
+                name,
+                arguments,
+            } => {
+                let lifted_index = self
+                    .lifted_action_calls
+                    .get(&(location.line, location.column, name.clone()))
+                    .copied();
+
+                self.invoke_source_action_call(name, arguments, lifted_index)
+            }
             Statement::Fail { message, .. } => match self.eval_expr(message, None)? {
                 Value::String(message) => {
                     Err(RuntimeError::new(format!("action failed: {message}")))
@@ -3093,7 +3312,8 @@ impl Value {
             Value::Float(_) => "Float",
             Value::Bool(_) => "Bool",
             Value::String(_) => "String",
-            Value::Sequence { .. } => "ordered sequence",
+            Value::ValueSequence(_) => "ordered value sequence",
+            Value::Sequence { .. } => "modeled identity sequence",
         }
     }
 }
@@ -3119,6 +3339,14 @@ fn coerce_value(value: Value, target: &ValueType) -> Result<Value, RuntimeError>
             element_model,
             targets,
         }),
+        (ValueType::Sequence(element_type), Value::ValueSequence(values)) => {
+            let values = values
+                .into_iter()
+                .map(|value| coerce_value(value, element_type))
+                .collect::<Result<Vec<_>, _>>()?;
+
+            Ok(Value::ValueSequence(values))
+        }
         (ValueType::SequenceLive(expected_model), value) => Err(RuntimeError::new(format!(
             "cannot store {} in [live {}] value",
             value.type_name(),

@@ -57,6 +57,7 @@ fn runtime_with_selection(selected: &str, source_targets: &[&str]) -> Runtime {
         derived: HashMap::new(),
         actions: HashMap::new(),
         action_parameter_types: HashMap::new(),
+        lifted_action_calls: HashMap::new(),
         binding_order: Vec::new(),
         eval_stack: Vec::new(),
         action_stack: Vec::new(),
