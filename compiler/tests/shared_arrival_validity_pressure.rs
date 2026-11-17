@@ -170,14 +170,20 @@ impl SharedArrivalSession {
     }
 
     fn selected_name(&mut self) -> String {
-        match self.runtime.value("selectedFolderName").expect("selected name") {
+        match self
+            .runtime
+            .value("selectedFolderName")
+            .expect("selected name")
+        {
             Value::String(name) => name,
             other => panic!("selectedFolderName must be a String, got {other}"),
         }
     }
 
     fn route(&self) -> Option<&[i64]> {
-        self.arrival.as_ref().map(|arrival| arrival.segments.as_slice())
+        self.arrival
+            .as_ref()
+            .map(|arrival| arrival.segments.as_slice())
     }
 }
 
@@ -274,13 +280,11 @@ fn conservative_invalidation_loses_up_after_selection_preserving_rename() {
 
     assert_eq!(session.selected_name(), "Projects renamed");
     assert_eq!(session.route(), None);
-    assert!(
-        session
-            .up()
-            .expect_err("safe conservative adapter has no Up after rename")
-            .message
-            .contains("arrival context unavailable")
-    );
+    assert!(session
+        .up()
+        .expect_err("safe conservative adapter has no Up after rename")
+        .message
+        .contains("arrival context unavailable"));
 }
 
 #[test]
