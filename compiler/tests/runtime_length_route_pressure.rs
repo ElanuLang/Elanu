@@ -598,8 +598,8 @@ action consumeRoute(route: [Int]) {
 }
 "#;
 
-    let checked = check_source_with_runtime_models(source)
-        .expect("single sequence lift should check");
+    let checked =
+        check_source_with_runtime_models(source).expect("single sequence lift should check");
 
     let mut runtime = PartialPersistentRuntime::open(checked, MemoryProvider::default())
         .expect("runtime should initialize");
