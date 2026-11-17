@@ -546,3 +546,71 @@ action consumeRoute(route: [Int]) {
         "each repeated application should still observe and mutate shared transaction state"
     );
 }
+
+
+/// Repeated value application does not infer repeated writable authority.
+///
+/// A concrete sequence value can drive an ordinary value parameter, but a
+/// writable `state` grant is a separate semantic axis. The narrow lifting rule
+/// deliberately does not transport or duplicate that authority.
+#[test]
+fn sequence_lifting_does_not_infer_writable_authority() {
+    let source = r#"
+state total = 0
+
+action consume(index: Int, state target: Int) {
+    target += index
+}
+
+action consumeRoute(route: [Int]) {
+    consume(route, state total)
+}
+"#;
+
+    let errors = check_source_with_runtime_models(source)
+        .expect_err("sequence lifting must not infer writable state authority");
+
+    assert!(
+        errors.iter().any(|error| {
+            error
+                .message
+                .contains("sequence-lifted action call cannot include writable state parameters")
+        }),
+        "unexpected writable-authority diagnostics: {errors:?}"
+    );
+}
+
+/// Empty ordered input performs zero repeated applications.
+///
+/// This follows directly from ordered repeated application rather than adding
+/// special empty-sequence behavior.
+#[test]
+fn empty_sequence_performs_zero_lifted_applications() {
+    let source = r#"
+state calls = 0
+
+action consume(index: Int) {
+    calls += 1
+}
+
+action consumeRoute(route: [Int]) {
+    consume(route)
+}
+"#;
+
+    let checked = check_source_with_runtime_models(source)
+        .expect("single sequence lift should check");
+
+    let mut runtime = PartialPersistentRuntime::open(checked, MemoryProvider::default())
+        .expect("runtime should initialize");
+
+    runtime
+        .run_action_with_values("consumeRoute", &[Value::ValueSequence(Vec::new())])
+        .expect("empty ordered input should be a successful zero-application replay");
+
+    assert_eq!(
+        runtime.value("calls").unwrap(),
+        Value::Int(0),
+        "empty ordered input must not invoke the lifted action"
+    );
+}
