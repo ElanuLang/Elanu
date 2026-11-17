@@ -4,6 +4,10 @@
 
 ### Language and semantics
 
+- Added immutable primitive-element ordinary sequence action input and narrow ordered action application: when exactly one `[T]` value argument supplies a scalar `T` value parameter, the compiler infers repeated in-order nested action application inside the existing transaction.
+- Scalar companion values are evaluated once and reused across the repeated applications; empty input performs zero applications and later failure rolls back the whole enclosing action.
+- Multiple sequence-to-scalar arguments, writable `state` parameters in a lifted call, `[live T]` identity-sequence action input, general loops/iterators, zip/product semantics, and action returns remain unselected.
+
 - Clarified lifetime/rooting source vocabulary without changing semantics: `create ... under ...`, `reroot ... from ... to ...`, `destroy ... under ...`, and `purge ... under ...` now distinguish provenance operations from structural `insert ... into ...` / `remove ... from ...`.
 
 - Added model-local `maybe live T` state so each concrete modeled identity can persist zero-or-one exact related live identity without encoding a singular relation as `[live T]` structure.
@@ -39,6 +43,10 @@
   rollback while adding ordering-key dependencies.
 
 ### Compiler/runtime
+
+- Added a distinct runtime `ValueSequence` carrier for ordinary ordered values so host-supplied `[T]` data remains separate from modeled-identity `[live T]` sequences.
+- Preserved checker-selected single-sequence action lifting as structured checked-program metadata so ordinary action calls retain the existing source-shaped runtime path rather than rediscovering traversal from runtime values.
+- Extended the partial-persistent host value boundary to carry ordinary sequences without reconstructing source expressions while recursively rejecting modeled-identity sequence carriers.
 
 - Added host-driven partial-persistence materialization from a static modeled-root stored-sequence index, resolving exact child identity/backing inside the runtime while keeping numeric occurrence distinct from child identity.
 - Added host-driven partial-persistence materialization by top-level source live designation, preserving the source-to-lowered runtime binding structurally so hosts need not see dynamic identities or backing keys.
