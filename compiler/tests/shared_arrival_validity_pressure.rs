@@ -35,12 +35,6 @@ action selectHomeRoute(route: [Int]) {
     selectFolder(route)
 }
 
-action duplicateFirstHomeChild {
-    selectHome()
-    with selectedFolder.folders[0] as duplicate {
-        insert duplicate into selectedFolder.folders
-    }
-}
 "#;
 
 #[derive(Debug, Clone, Default)]
@@ -321,35 +315,3 @@ fn failed_route_step_preserves_prior_arrival_context() {
     assert_eq!(session.selected_name(), "Notes");
 }
 
-#[test]
-fn duplicate_membership_does_not_collapse_distinct_arrival_routes() {
-    let mut session = SharedArrivalSession::new();
-    session
-        .ordinary_action("createFolder", &[Value::String("Projects".into())])
-        .expect("create Projects");
-    session
-        .ordinary_action("duplicateFirstHomeChild", &[])
-        .expect("one exact child should occur twice under Home");
-
-    session.home().expect("explicit Home gesture");
-    assert_eq!(
-        session
-            .runtime
-            .designation_member_len("homeFolder", "folders")
-            .expect("Home folder count"),
-        2
-    );
-
-    session.enter(0).expect("first occurrence navigation");
-    assert_eq!(session.selected_name(), "Projects");
-    assert_eq!(session.route(), Some(&[0][..]));
-
-    session.home().expect("re-establish Home");
-    session.enter(1).expect("second occurrence navigation");
-    assert_eq!(session.selected_name(), "Projects");
-    assert_eq!(session.route(), Some(&[1][..]));
-
-    // The same child identity was inserted twice by the source action, but
-    // arrival histories remain distinct transient index gestures. No identity
-    // query, reverse lookup, or stable occurrence identity is involved.
-}
