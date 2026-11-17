@@ -93,6 +93,48 @@ It is intentionally narrower than a general exception model. Current Elanu does 
 
 Revisit when a realistic partial-success workflow demonstrates that all-or-nothing action composition is insufficient.
 
+## One ordinary ordered argument may drive repeated action composition
+
+Decision:
+
+> When exactly one ordinary action-call value argument has type `[T]` where the
+> corresponding ordinary parameter expects `T`, Elanu may infer ordered repeated
+> application from the sequence structure instead of requiring source-level traversal
+> mechanics.
+
+The sequence and all scalar companion value arguments are evaluated once at the call site.
+The action is then invoked once per sequence element, in order, inside the existing shared
+action transaction. Empty input performs zero invocations. A later failure rolls back
+earlier repeated applications with the rest of the enclosing action.
+
+This rule exists because the application intent is already present:
+
+```text
+ordered value supplied
+scalar action parameter expected
+one sequence mismatch
+nested action transaction already defined
+```
+
+Requiring an explicit counter, index loop, iterator, or `each` construct would expose
+mechanical traversal structure the compiler can derive without adding semantic information.
+
+The inference stops where application intent becomes ambiguous. Two or more sequence-to-
+scalar mismatches do not imply zip, Cartesian product, broadcasting, or nested traversal,
+so they remain rejected. A lifted call also cannot contain writable `state` parameters:
+ordinary values and writable authority are separate semantic axes, and traversing a value
+does not infer repeated authority grants. Modeled-identity `[live T]` sequences remain
+outside this ordinary value-input rule.
+
+This is action composition, not a general vectorization or collection-processing system.
+It does not select iterators, cursors, general loops, `map`, action returns, stable element
+identity, or a conventional collection API.
+
+Revisit if concrete composition pressure requires more than one ordered input, repeated
+writable authority, action results, or traversal whose order/termination cannot be inferred
+from one supplied ordered value. Do not generalize from familiarity with conventional loop
+or functional-collection constructs alone.
+
 ## Program equality and state invalidation equivalence are different relations
 
 Source-level equality answers ordinary program-logic questions. State equivalence answers whether a write is observably different enough to invalidate dependents.
