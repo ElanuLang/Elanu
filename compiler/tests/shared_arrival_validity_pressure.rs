@@ -36,8 +36,9 @@ action selectHomeRoute(route: [Int]) {
 }
 
 action duplicateFirstHomeChild {
-    with homeFolder.folders[0] as duplicate {
-        insert duplicate into homeFolder.folders
+    selectHome()
+    with selectedFolder.folders[0] as duplicate {
+        insert duplicate into selectedFolder.folders
     }
 }
 "#;
