@@ -36,6 +36,7 @@ pub struct CheckedProgram {
     binding_types: HashMap<String, ValueType>,
     action_parameter_types: HashMap<String, Vec<ValueType>>,
     runtime_reductions: HashMap<String, RuntimeReductionPayload>,
+    lifted_action_calls: Vec<(SourceLocation, String, usize)>,
 }
 
 impl CheckedProgram {
@@ -49,6 +50,10 @@ impl CheckedProgram {
 
     pub fn runtime_reduction(&self, name: &str) -> Option<&RuntimeReductionPayload> {
         self.runtime_reductions.get(name)
+    }
+
+    pub(crate) fn lifted_action_calls(&self) -> &[(SourceLocation, String, usize)] {
+        &self.lifted_action_calls
     }
 }
 
@@ -114,6 +119,7 @@ pub fn check_with_runtime_reductions(
         action_signatures,
         parameters: HashMap::new(),
         runtime_reduction_types,
+        lifted_action_calls: Vec::new(),
         errors: Vec::new(),
         current_location: SourceLocation::new(1, 1),
     };
@@ -144,6 +150,7 @@ pub fn check_with_runtime_reductions(
             binding_types,
             action_parameter_types,
             runtime_reductions,
+            lifted_action_calls: checker.lifted_action_calls,
         })
     } else {
         Err(checker.errors)
@@ -156,6 +163,7 @@ struct Checker {
     action_signatures: HashMap<String, Vec<ActionParameter>>,
     parameters: HashMap<String, LocalSymbol>,
     runtime_reduction_types: HashMap<String, ValueType>,
+    lifted_action_calls: Vec<(SourceLocation, String, usize)>,
     errors: Vec<Diagnostic>,
     current_location: SourceLocation,
 }
@@ -544,34 +552,43 @@ impl Checker {
             })
             .collect::<Vec<_>>();
 
-        let lift_count = parameters
+        let lifted_indices = parameters
             .iter()
             .zip(arguments)
             .zip(&inferred_value_types)
-            .filter(|((parameter, argument), actual)| {
+            .enumerate()
+            .filter_map(|(index, ((parameter, argument), actual))| {
                 let (ActionParameterKind::Value, ActionArgument::Value(_), Some(actual)) =
-                    (parameter.kind, *argument, actual.as_ref())
+                    (parameter.kind, argument, actual.as_ref())
                 else {
-                    return false;
+                    return None;
                 };
 
                 let expected = parse_type_name(&parameter.type_name);
-                sequence_lift_assignable(&expected, actual)
+                sequence_lift_assignable(&expected, actual).then_some(index)
             })
-            .count();
+            .collect::<Vec<_>>();
 
-        if lift_count == 1
-            && parameters
-                .iter()
-                .any(|parameter| parameter.kind == ActionParameterKind::State)
-        {
+        let lifted_index = match lifted_indices.as_slice() {
+            [index] => Some(*index),
+            _ => None,
+        };
+
+        let has_state_parameter = parameters
+            .iter()
+            .any(|parameter| parameter.kind == ActionParameterKind::State);
+
+        if lifted_index.is_some() && has_state_parameter {
             self.error(
                 "sequence-lifted action call cannot include writable state parameters".to_string(),
             );
         }
 
-        for ((parameter, argument), actual) in
-            parameters.iter().zip(arguments).zip(inferred_value_types)
+        for (index, ((parameter, argument), actual)) in parameters
+            .iter()
+            .zip(arguments)
+            .zip(inferred_value_types)
+            .enumerate()
         {
             let expected = parse_type_name(&parameter.type_name);
 
@@ -579,8 +596,8 @@ impl Checker {
                 (ActionParameterKind::Value, ActionArgument::Value(_)) => {
                     if let Some(actual) = actual {
                         let ordinary = assignable_to(&expected, &actual);
-                        let lifted =
-                            lift_count == 1 && sequence_lift_assignable(&expected, &actual);
+                        let lifted = lifted_index == Some(index)
+                            && sequence_lift_assignable(&expected, &actual);
 
                         if !ordinary && !lifted {
                             self.error(format!(
@@ -629,7 +646,18 @@ impl Checker {
                 }
             }
         }
+
+        if let Some(lifted_index) = lifted_index {
+            if !has_state_parameter {
+                self.lifted_action_calls.push((
+                    self.current_location,
+                    name.to_string(),
+                    lifted_index,
+                ));
+            }
+        }
     }
+
     fn resolve_writable_state_grant(&mut self, name: &str) -> Option<ValueType> {
         if let Some(parameter) = self.parameters.get(name).cloned() {
             return match parameter.kind {
@@ -932,6 +960,7 @@ fn sequence_lift_assignable(target: &ValueType, source: &ValueType) -> bool {
 
     assignable_to(target, element)
 }
+
 pub(crate) fn assignable_to(target: &ValueType, source: &ValueType) -> bool {
     target == source || (matches!(target, ValueType::Float) && matches!(source, ValueType::Int))
 }
