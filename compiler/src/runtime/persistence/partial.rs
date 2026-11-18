@@ -1410,6 +1410,9 @@ fn synchronize_backing_handles(
 }
 
 #[cfg(test)]
+mod arrival_continuity_pressure;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use std::collections::HashMap;
