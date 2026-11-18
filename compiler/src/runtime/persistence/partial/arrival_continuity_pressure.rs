@@ -99,13 +99,8 @@ fn observe(runtime: &mut CabinetRuntime, indices: &[usize]) -> Option<RouteWitne
     for &index in indices {
         let handle = runtime.backed.get(&current)?.clone();
         runtime.materialize(&encode_key(handle.token)).ok()?;
-        let values = runtime_backing_values(
-            &runtime.checked,
-            &runtime.runtime,
-            &current,
-            &handle,
-        )
-        .ok()?;
+        let values =
+            runtime_backing_values(&runtime.checked, &runtime.runtime, &current, &handle).ok()?;
         let Value::Sequence { targets, .. } = values.get("folders")? else {
             return None;
         };
@@ -139,8 +134,7 @@ fn initialized() -> CabinetRuntime {
     let source = format!("{CABINET}\n{PRESSURE_SOURCE}");
     let checked = crate::check_source_with_runtime_models(&source)
         .expect("Cabinet plus test-only actions must check");
-    let mut runtime =
-        PartialPersistentRuntime::open(checked, MemoryProvider::default()).unwrap();
+    let mut runtime = PartialPersistentRuntime::open(checked, MemoryProvider::default()).unwrap();
     runtime.run_action("initialize").unwrap();
     runtime
         .run_action_with_values("createFolder", &[Value::String("Projects".into())])
@@ -208,11 +202,17 @@ fn structural_reorder_invalidates_despite_unchanged_selected_identity() {
         .unwrap();
     replay(&mut runtime, &[0]);
     let witness = observe(&mut runtime, &[0]).unwrap();
-    let selected_before = runtime.designation_identity_and_handle("selectedFolder").unwrap().0;
+    let selected_before = runtime
+        .designation_identity_and_handle("selectedFolder")
+        .unwrap()
+        .0;
 
     runtime.run_action("reorderHome").unwrap();
 
-    let selected_after = runtime.designation_identity_and_handle("selectedFolder").unwrap().0;
+    let selected_after = runtime
+        .designation_identity_and_handle("selectedFolder")
+        .unwrap()
+        .0;
     assert_eq!(selected_before, selected_after);
     assert_eq!(
         runtime.value("selectedFolderName").unwrap(),
@@ -237,7 +237,9 @@ fn failed_transition_preserves_opaque_continuity() {
 fn duplicate_occurrence_routes_have_distinct_witnesses_even_with_same_target() {
     let mut runtime = initialized();
     replay(&mut runtime, &[0]);
-    runtime.run_action("duplicateSelectedHomeOccurrence").unwrap();
+    runtime
+        .run_action("duplicateSelectedHomeOccurrence")
+        .unwrap();
 
     replay(&mut runtime, &[0]);
     let first = observe(&mut runtime, &[0]).unwrap();
